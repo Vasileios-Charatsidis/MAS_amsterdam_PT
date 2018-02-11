@@ -34,24 +34,24 @@ to execute-actions
   ifelse current_stop > -1 [
     
     ;let pass_at_destination filter [ i -> item 1 i = current_stop] map [ i -> item 0 i ] bus_passengers
-    let pass_at_destination filter [ i -> item 1 i = current_stop] bus_passengers
-    let pass_id_at_destination map [ i -> item 0 i ] pass_at_destination
+    let pass_at_destination filter [ item 1 ? = current_stop] bus_passengers
+    let pass_id_at_destination map [ item 0 ? ] pass_at_destination
     
     show "passengers that have now reach their destination"
     show pass_at_destination
     show pass_id_at_destination
     
-    foreach pass_id_at_destination [ i -> drop-off-passenger i ]
+    foreach pass_id_at_destination [ drop-off-passenger ? ]
     
     show "passengers waiting at this stop and their destination"
     show get-passengers-at-stop current_stop
     
-    let pass_here map [ i -> item 0 i ] get-passengers-at-stop current_stop
+    let pass_here map [ item 0 ? ] get-passengers-at-stop current_stop
     
     show "only the passenger-ids"
     show pass_here
     
-    foreach pass_here [i -> pick-up-passenger i]
+    foreach pass_here [pick-up-passenger ?]
     
     show "passengers that are now on the bus"
     show bus_passengers
