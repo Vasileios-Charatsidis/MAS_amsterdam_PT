@@ -1,2 +1,5 @@
-# MAS_amsterdam_PT
-A hypothetical Multi-Agent System governing the public transport in Amsterdam for the UvA/VU course 2018
+<h2 align="center">
+  <img src="banner.png"/>
+  <br><br>
+  A Multi-Agent System governing the public transport in Amsterdam
+</h2>
