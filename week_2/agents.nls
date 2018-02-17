@@ -73,7 +73,7 @@ to execute-actions
     show word "Bus stops we can get to from here: " item current_stop graph  ; note to self: is this how graph works?
 
     ; check if passenger is on route otherwise take other bus.
-    change-passenger-destination-to-centraal
+    ; change-passenger-destination-to-centraal
 
     set cur_stop cur_stop + 1
     if cur_stop = length routing [ set cur_stop 0 ]
