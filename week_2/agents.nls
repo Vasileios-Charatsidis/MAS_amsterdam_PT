@@ -9,118 +9,78 @@ buses-own [
   previous_stop   ; ID of the last bus stop that the agent (bus) visited (-1 means that the agent has not visited any bus stop yet).
   current_stop    ; ID of the bus stop where the agent (bus) currently is (-1 means that the agent is not at any bus stop).
   next_stop       ; ID of the bus stop the agent (bus) is traveling to (-1 means that the agent is not travelling to any bus stop).
-  adding
-  cur_stop
+
+  ; local variables
+  adding          ; add bus if adding is 0
+  cur_stop        ; current stop index
   routing
-  
-  
-  
-
-  ; New local variables for students.
-  ; You can create any new local variable you want. Just declare them here.
-
 ]
 
-globals [graph]
+
+globals [
+  graph
+]
+
 
 to init-buses
-  ; Initialize your agents here.
-  ; This list contains the topology of the entire network of bus stops, which is known to all agents. You can use this, for instance, to calculate the shortest path between two bus stops.
-  set graph [[22 15 14] [11 19 23 7] [8] [16 4 20 9] [3 5 10] [4 16 10 17] [8] [1 17 13] [2 6 9] [3 8 20] [4 5 17 13 21] [1 16 17] [20 15 22] [7 10 22 23] [0 23] [0 12 18] [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]]
-  
+  ; Initialize Agents
+
+  ; Define routes to agents
+  if bus_id = 24 [ set routing [ 3 9 8 6 8 2 8 9 3 ] ]
+  if bus_id = 25 [ set routing [ 3 4 20 12 15 18 15 12 20 4 ] ]
+  if bus_id = 26 [ set routing [ 3 4 10 21 22 0 14 23 19 23 13 22 21 10 4 ] ]
+  if bus_id = 27 [ set routing [ 3 16 11 17 7 1 7 17 11 16 ] ]
+
+  ; This list contains the topology of the entire network of bus stops, which is known to all
+  ; agents. This can be used to calculate the shortest path between two bus stops.
+  set graph [ [22 15 14] [11 19 23 7] [8] [16 4 20 9] [3 5 10] [4 16 10 17] [8] [1 17 13]
+              [2 6 9] [3 8 20] [4 5 17 13 21] [1 16 17] [20 15 22] [7 10 22 23] [0 23] [0 12 18]
+              [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]
+  ]
+
 end
-
-
 
 
 to execute-actions
   ; Add decision making strategies for your agents here.
   ; You are allowed to use the global variable 'ticks'.
 
-  show "current stop"
-  show current_stop
-  
   if adding = 0 [
-  if bus_id = 24 or bus_id = 25 or bus_id = 26  [add-bus 1 set adding 1]]
-  
-  
-  
-  ifelse current_stop > -1 [
-    
-    ;let pass_at_destination filter [ i -> item 1 i = current_stop] map [ i -> item 0 i ] bus_passengers
-    let pass_at_destination filter [ item 1 ? = current_stop] bus_passengers
-    let pass_id_at_destination map [ item 0 ? ] pass_at_destination
-    
-    show "passengers that have now reach their destination"
-    show pass_at_destination
-    show pass_id_at_destination
-    
-    foreach pass_id_at_destination [ drop-off-passenger ? ]
-    
-    show "passengers waiting at this stop and their destination"
-    show get-passengers-at-stop current_stop
-    
-    let pass_here map [ item 0 ? ] get-passengers-at-stop current_stop
-    
-    show "only the passenger-ids"
-    show pass_here
-    
-    foreach pass_here [pick-up-passenger ?]
-    
-    show "passengers that are now on the bus"
-    show bus_passengers
-    
-    show "bus stops we can get to from here"
-    show item current_stop graph ; note to self: is this how graph works?
-    
-    
-    ; make routes
-    
-    ; check if passenger is on route otherwise take other bus.
-    
-    
-    
-    if bus_id = 24 [ 
-      set routing [3 9 8 6 8 2 8 9 3]
-      set cur_stop cur_stop + 1
-      if cur_stop = length routing [set cur_stop 0]
-      travel-to item cur_stop routing
-      ]
-    
-    if bus_id = 25 [ 
-      set routing [3 4 20 12 15 18 15 12 20 4]
-      set cur_stop cur_stop + 1
-      if cur_stop = length routing [set cur_stop 0]
-      travel-to item cur_stop routing
-      ]
-    
-    
-   
-    
-    if bus_id = 26 [ 
-      set routing [3 4 10 21 22 0 14 23 19 23 13 22 21 10 4]
-      set cur_stop cur_stop + 1
-      if cur_stop = length routing [set cur_stop 0]
-      travel-to item cur_stop routing
-      ]
-    
-   if bus_id = 27 [ 
-      set routing [3 16 11 17 7 1 7 17 11 16]
-      set cur_stop cur_stop + 1
-      if cur_stop = length routing [set cur_stop 0]
-      travel-to item cur_stop routing
-      ]
-    
-    
-    
-  ][
-    travel-to next_stop
+   if bus_id = 24 or bus_id = 25 or bus_id = 26  [
+     add-bus 1 set adding 1
+   ]
   ]
-  
-  show "we are going to:"
-  show next_stop
-  show bus_id
-  
-  
+
+  ifelse current_stop > -1 [
+
+    show "---------------------------------"
+    show word "Current stop: " current_stop
+
+    let pass_at_destination filter [ item 1 ? = current_stop ] bus_passengers
+    let pass_id_at_destination map [ item 0 ? ] pass_at_destination
+
+    show word "Passengers that have now reached their destination: " pass_id_at_destination
+
+    foreach pass_id_at_destination [ drop-off-passenger ? ]
+
+    show word "Passengers waiting at this stop and their destination: " get-passengers-at-stop current_stop
+
+    let pass_here map [ item 0 ? ] get-passengers-at-stop current_stop
+
+    foreach pass_here [ pick-up-passenger ? ]
+
+    show word "Passengers that are now on the bus: " bus_passengers
+    show word "Bus stops we can get to from here: " item current_stop graph  ; note to self: is this how graph works?
+
+    ; check if passenger is on route otherwise take other bus.
+
+    set cur_stop cur_stop + 1
+    if cur_stop = length routing [ set cur_stop 0 ]
+    travel-to item cur_stop routing
+
+    show word "Next stop: " next_stop
+
+  ]
+  [ travel-to next_stop ]
 
 end
