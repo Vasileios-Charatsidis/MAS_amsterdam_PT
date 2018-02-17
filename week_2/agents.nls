@@ -73,6 +73,7 @@ to execute-actions
     show word "Bus stops we can get to from here: " item current_stop graph  ; note to self: is this how graph works?
 
     ; check if passenger is on route otherwise take other bus.
+    change-passenger-destination-to-centraal
 
     set cur_stop cur_stop + 1
     if cur_stop = length routing [ set cur_stop 0 ]
@@ -82,5 +83,30 @@ to execute-actions
 
   ]
   [ travel-to next_stop ]
+
+end
+
+
+to change-passenger-destination-to-centraal
+  ; If the picked up passenger's destination is not on the bus-route,
+  ; then drop off the passenger at centraal station
+
+  ; TODO: Revisit this. There should be a smarter way.
+  let temp_list []
+
+  foreach bus_passengers [
+    let temp_passenger ?
+    let pos1 position item 1 temp_passenger routing
+
+    ; show word "routing: " routing
+    ; show word "position: " pos1
+
+    if (is-boolean? pos1) and (not pos1) [
+      set temp_passenger replace-item 1 temp_passenger 3  ; drop the passenger at Centraal station
+    ]
+
+    set temp_list lput temp_passenger temp_list
+  ]
+  set bus_passengers temp_list
 
 end
