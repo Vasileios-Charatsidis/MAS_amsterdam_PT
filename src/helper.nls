@@ -43,12 +43,39 @@ to-report free-spaces-on-bus
   ; Compute the number of free spaces on the bus
   ; Return:
   ;   @number: free spaces
-  
+
   let capacity bus-capacity
-  
+
   report capacity - length bus_passengers
 end
 
-  
+
+to change-passenger-destination-to-centraal
+  ; DEPRECATED
+  ; If the picked up passenger's destination is not on the bus-route,
+  ; then drop off the passenger at centraal station
+
+  ; TODO: Revisit this. There should be a smarter way.
+  let temp_list []
+
+  foreach bus_passengers [
+    let temp_passenger ?
+
+    ; FIXME: Logic Changed - routing is not defined anymore
+    ; let pos1 position item 1 temp_passenger routing
+    let pos1 9
+
+    ; show word "routing: " routing
+    ; show word "position: " pos1
+
+    if (is-boolean? pos1) and (not pos1) [
+      set temp_passenger replace-item 1 temp_passenger 3  ; drop the passenger at Centraal station
+    ]
+
+    set temp_list lput temp_passenger temp_list
+  ]
+  set bus_passengers temp_list
+
+end
   
   
