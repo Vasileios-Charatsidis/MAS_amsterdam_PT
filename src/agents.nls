@@ -24,7 +24,6 @@ globals [
 
 to init-buses
   ; Initialize Agents
-  set bus_type 2
 
   ; This list contains the topology of the entire network of bus stops, which is known to all
   ; agents. This can be used to calculate the shortest path between two bus stops.
