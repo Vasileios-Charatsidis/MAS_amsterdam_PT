@@ -1,4 +1,4 @@
-; File contains all the utility functions used.
+; File contains all the helper functions used.
 ; This is included in the agents.nls file.
 ;
 ; All the variables in buses-own and globals can be accessed here
@@ -16,3 +16,39 @@ to-report passenger-count-at-bus-stop [ bus_stop ]
   report length passengers_at_stop
 
 end
+
+
+to-report bus-capacity
+  ; Return:
+  ;   @capacity: the capacity of the bus based on its type
+  
+  let capacity 0
+  
+  ifelse bus_type = 1 [ 
+    set capacity 12
+  ] [
+    ifelse bus_type = 2 [
+      set capacity 60
+    ] [
+      set capacity 150
+    ]
+  ]
+
+  report capacity
+
+end
+  
+
+to-report free-spaces-on-bus
+  ; Compute the number of free spaces on the bus
+  ; Return:
+  ;   @number: free spaces
+  
+  let capacity bus-capacity
+  
+  report capacity - length bus_passengers
+end
+
+  
+  
+  

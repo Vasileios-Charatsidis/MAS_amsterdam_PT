@@ -45,9 +45,9 @@ to execute-actions
    ]
   ]
 
-  if current_stop > -1 [
+  show "---------------------------------"
 
-    show "---------------------------------"
+  if current_stop > -1 [
     show (word "Current stop: " current_stop)
 
     let pass_at_destination filter [ item 1 ? = current_stop ] bus_passengers
@@ -55,10 +55,18 @@ to execute-actions
 
     show (word "Passengers that have now reached their destination: " pass_id_at_destination)
 
-    foreach pass_id_at_destination [ drop-off-passenger ? ]
+    foreach pass_id_at_destination [
+      if item 1 ? = current_stop [
+        drop-off-passenger item 0 ? 
+      ]
+    ]
 
-    let pass_here map [ item 0 ? ] get-passengers-at-stop current_stop
-    foreach pass_here [ pick-up-passenger ? ]
+    let free_spaces free-spaces-on-bus
+
+    if free_spaces > 0 [
+      let pass_here map [ item 0 ? ] get-passengers-at-stop current_stop
+      foreach pass_here [ pick-up-passenger ? ]
+    ]
 
     show (word "Passengers that are now on the bus: " bus_passengers)
 
@@ -100,11 +108,24 @@ to-report choose-next-bus-stop
     set utilities lput u utilities
     set index index + 1
   ]
+  
+  ; Get list of max_utilities
+  let max_utility_indices []
+  set index 0
+
+  foreach utilities [
+    if ? = max_utility [
+      set max_utility_indices lput index max_utility_indices
+    ]
+    set index index + 1
+  ]
 
   show (word "Connecting bus stops: " connecting_nodes)
   show (word "Utilites for stops:   " utilities)
 
-  report item max_index connecting_nodes
+  let select_node item random length max_utility_indices max_utility_indices
+
+  report item select_node connecting_nodes
 
 end
 
@@ -113,10 +134,34 @@ to-report utility_for_stop [ bus_stop ]
   ; Compute the utility for a bus stop
   ; Args:
   ;   @bus_stop
-  ; Return
+  ; Return:
   ;   @utility
 
-    report passenger-count-at-bus-stop bus_stop
+  let capacity bus-capacity
+
+  ; Free spaces in the bus
+  let free_spaces free-spaces-on-bus
+;  show (word "Free spaces in bus: " free_spaces)
+
+  ; 'Droppable' passengers in the potential next bus stop
+  let dropoffs 0
+  foreach bus_passengers [
+     if item 1 ? = bus_stop [
+       set dropoffs dropoffs + 1
+     ]
+  ]
+;  show (word "Droppable passenger count: " dropoffs)
+  
+  ; alpha
+  let alpha free_spaces / capacity
+;  show (word "alpha: " alpha)
+
+  ; Potential pick ups
+  let pickups min list passenger-count-at-bus-stop bus_stop free_spaces
+
+  let utility_value (1 - alpha) * dropoffs + alpha * pickups
+
+  report utility_value
 
 end
 
