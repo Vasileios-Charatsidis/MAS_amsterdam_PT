@@ -1,3 +1,5 @@
+__includes ["helper.nls"]
+
 buses-own [
   ; Static, read-only variables. These values never change. You can read them, but you cannot change them.
   bus_id          ; The ID of a given agent (bus). Each agent has a unique ID.
@@ -11,9 +13,7 @@ buses-own [
   next_stop       ; ID of the bus stop the agent (bus) is traveling to (-1 means that the agent is not travelling to any bus stop).
 
   ; local variables
-  adding          ; add bus if adding is 0
-  cur_stop        ; current stop index
-  routing
+  add_buses       ; if true, add buses
 ]
 
 
@@ -24,12 +24,6 @@ globals [
 
 to init-buses
   ; Initialize Agents
-
-  ; Define routes to agents
-  if bus_id = 24 [ set routing [ 3 9 8 6 8 2 8 9 3 ] ]
-  if bus_id = 25 [ set routing [ 3 4 20 12 15 18 15 12 20 4 ] ]
-  if bus_id = 26 [ set routing [ 3 4 10 21 22 0 14 23 19 23 13 22 21 10 4 ] ]
-  if bus_id = 27 [ set routing [ 3 16 11 17 7 1 7 17 11 16 ] ]
 
   ; This list contains the topology of the entire network of bus stops, which is known to all
   ; agents. This can be used to calculate the shortest path between two bus stops.
@@ -45,44 +39,84 @@ to execute-actions
   ; Add decision making strategies for your agents here.
   ; You are allowed to use the global variable 'ticks'.
 
-  if adding = 0 [
+  if add_buses = 0 [
    if bus_id = 24 or bus_id = 25 or bus_id = 26  [
-     add-bus 1 set adding 1
+     add-bus 1 set add_buses 1
    ]
   ]
 
-  ifelse current_stop > -1 [
+  if current_stop > -1 [
 
     show "---------------------------------"
-    show word "Current stop: " current_stop
+    show (word "Current stop: " current_stop)
 
     let pass_at_destination filter [ item 1 ? = current_stop ] bus_passengers
     let pass_id_at_destination map [ item 0 ? ] pass_at_destination
 
-    show word "Passengers that have now reached their destination: " pass_id_at_destination
+    show (word "Passengers that have now reached their destination: " pass_id_at_destination)
 
     foreach pass_id_at_destination [ drop-off-passenger ? ]
 
-    show word "Passengers waiting at this stop and their destination: " get-passengers-at-stop current_stop
-
     let pass_here map [ item 0 ? ] get-passengers-at-stop current_stop
-
     foreach pass_here [ pick-up-passenger ? ]
 
-    show word "Passengers that are now on the bus: " bus_passengers
-    show word "Bus stops we can get to from here: " item current_stop graph  ; note to self: is this how graph works?
+    show (word "Passengers that are now on the bus: " bus_passengers)
 
     ; check if passenger is on route otherwise take other bus.
     ; change-passenger-destination-to-centraal
 
-    set cur_stop cur_stop + 1
-    if cur_stop = length routing [ set cur_stop 0 ]
-    travel-to item cur_stop routing
-
-    show word "Next stop: " next_stop
-
+    set next_stop choose-next-bus-stop
   ]
-  [ travel-to next_stop ]
+
+  show (word "Next stop: " next_stop)
+  travel-to next_stop
+
+end
+
+
+to-report choose-next-bus-stop
+  ; From the current bus stop, choose the next bus stop to visit
+  ; Currently we choose the bus stop with the maximum number of passengers
+  ; return:
+  ;  @ next_stop
+
+  ; Get the connecting nodes of the current bus stop
+  let connecting_nodes item current_stop graph
+
+  let utilities []
+  let max_index -1
+  let max_utility -1000
+  let index 0
+
+  foreach connecting_nodes [
+    ; Get the utility for each of the connecting nodes
+    let u utility_for_stop ?
+
+    if u > max_utility [
+      set max_index index
+      set max_utility u
+    ]
+
+    set utilities lput u utilities
+    set index index + 1
+  ]
+
+  show (word "Connecting bus stops: " connecting_nodes)
+  show (word "Utilites for stops:   " utilities)
+
+  report item max_index connecting_nodes
+
+end
+
+
+to-report utility_for_stop [ bus_stop ]
+  ; Compute the utility for a bus stop
+  ; Args:
+  ;   @bus_stop
+  ; Return
+  ;   @utility
+
+    report passenger-count-at-bus-stop bus_stop
 
 end
 
@@ -96,7 +130,10 @@ to change-passenger-destination-to-centraal
 
   foreach bus_passengers [
     let temp_passenger ?
-    let pos1 position item 1 temp_passenger routing
+
+    ; FIXME: Logic Changed - routing is not defined anymore
+    ; let pos1 position item 1 temp_passenger routing
+    let pos1 9
 
     ; show word "routing: " routing
     ; show word "position: " pos1

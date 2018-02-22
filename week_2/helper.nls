@@ -1,0 +1,18 @@
+; File contains all the utility functions used.
+; This is included in the agents.nls file.
+;
+; All the variables in buses-own and globals can be accessed here
+
+
+to-report passenger-count-at-bus-stop [ bus_stop ]
+  ; Compute the number of passengers at a bus stop
+  ; Args:
+  ;   @bus_stop
+  ;
+  ; Return:
+  ;   @len: the number of passengers at each bus stop
+
+  let passengers_at_stop get-passengers-at-stop bus_stop
+  report length passengers_at_stop
+
+end
