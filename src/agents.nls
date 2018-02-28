@@ -11,6 +11,7 @@ buses-own [
   previous_stop   ; ID of the last bus stop that the agent (bus) visited (-1 means that the agent has not visited any bus stop yet).
   current_stop    ; ID of the bus stop where the agent (bus) currently is (-1 means that the agent is not at any bus stop).
   next_stop       ; ID of the bus stop the agent (bus) is traveling to (-1 means that the agent is not travelling to any bus stop).
+  has_plan        ; ID's of passengers for which another bus already has a plan, passengers that don't need to be picked up by you. list of lists. list per bus stop
 
   ; local variables
   add_buses       ; if true, add buses
@@ -40,12 +41,20 @@ to execute-actions
   ; You are allowed to use the global variable 'ticks'.
 
   if add_buses = 0 [
-   if bus_id = 24 or bus_id = 25 or bus_id = 26 or bus_id = 27 or
-      bus_id = 28 or bus_id = 29 or bus_id = 30 or bus_id = 31 or
-      bus_id = 32 or bus_id = 33 or bus_id = 34 [
-     add-bus 1 set add_buses 1
-   ]
+    let n 60
+    let iter n-values n [ ? + 23 ]
+    foreach iter [
+     if bus_id = ? [
+     add-bus 1 set add_buses 1 
+     ]
+    ]
   ]
+  ; if bus_id = 24 or bus_id = 25 or bus_id = 26 or bus_id = 27 or
+   ;   bus_id = 28 or bus_id = 29 or bus_id = 30 or bus_id = 31 or
+  ;    bus_id = 32 or bus_id = 33 or bus_id = 34 [
+  ;   add-bus 1 set add_buses 1
+ ;  ]
+ ; ]
 
   ;show "---------------------------------"
 
@@ -82,7 +91,7 @@ to execute-actions
   ;show (word "Next stop: " next_stop)
   travel-to next_stop
   
-  communicate
+  ;communicate
 
 end
 
@@ -131,7 +140,6 @@ to-report choose-next-bus-stop
 
 end
 
-
 to-report utility_for_stop [ bus_stop ]
   ; Compute the utility for a bus stop
   ; Args:
@@ -163,138 +171,139 @@ to-report utility_for_stop [ bus_stop ]
 
 end
 
-to-report construct_outgoing_message 
-  ; constructs a message to other busses saying what the possible routes are this bus can take, what it can do at the stops and what its utility is
-  ; "bus_id current_station target_station pickup dropoff utility target_station pickup dropoff utility"
-   
-  let msg []
-  let ground_stop -1 ; if you are on the way to station 5 (you don't cross any other stations), you may pretend that you are sending your message from there
-  
-  ifelse current_stop > -1 [
-    set ground_stop current_stop
-  ][
-    set ground_stop next_stop
-  ]
-  
-  let connecting_nodes item ground_stop graph
-   
-  let free_spaces free-spaces-on-bus
-  
-  set msg lput bus_id msg
-  set msg lput ground_stop msg
-  
-  foreach connecting_nodes [   
-    let stations_info [] ; list containing [target_station pickup dropoff utility] or [ [target_station pickup dropoff]*steps_ahead utility ]
-    let pickups min list passenger-count-at-bus-stop ? free_spaces
-    let dropoffs 0
-    foreach bus_passengers [
-     if item 1 ? = current_stop [
-       set dropoffs dropoffs + 1
-      ]
-    ]
-    let u utility_for_stop ?  
-    set stations_info lput ? stations_info  
-    set stations_info lput pickups stations_info
-    set stations_info lput dropoffs stations_info
-    set stations_info lput u stations_info
-    set msg lput stations_info msg
-  ]
+; the below needs to  change
 
-  report (word msg)
-end
+;to-report construct_outgoing_message 
+;  ; constructs a message to other busses saying what the possible routes are this bus can take, what it can do at the stops and what its utility is
+;  ; "bus_id current_station target_station pickup dropoff utility target_station pickup dropoff utility"
+;   
+;  let msg []
+;  let ground_stop -1 ; if you are on the way to station 5 (you don't cross any other stations), you may pretend that you are sending your message from there
+;  
+;  ifelse current_stop > -1 [
+;    set ground_stop current_stop
+;  ][
+;    set ground_stop next_stop
+;  ]
+;  
+;  let connecting_nodes item ground_stop graph
+;   
+;  let free_spaces free-spaces-on-bus
+;  
+;  set msg lput bus_id msg
+;  set msg lput ground_stop msg
+;  
+;  foreach connecting_nodes [   
+;    let stations_info [] ; list containing [target_station pickup dropoff utility] or [ [target_station pickup dropoff]*steps_ahead utility ]
+;    let pickups min list passenger-count-at-bus-stop ? free_spaces
+;    let dropoffs 0
+;    foreach bus_passengers [
+;     if item 1 ? = current_stop [
+;       set dropoffs dropoffs + 1
+;      ]
+;    ]
+;    let u utility_for_stop ?  
+;    set stations_info lput ? stations_info  
+;    set stations_info lput pickups stations_info
+;    set stations_info lput dropoffs stations_info
+;    set stations_info lput u stations_info
+;    set msg lput stations_info msg
+;  ]
+;
+;  report (word msg)
+;end
 
-to-report parse_msg [ msg ]
-  ; from a message string, get the relevant info
-  let start_id 0
-  let cur_id 0
-  let l []
-  let l2 []
-    
-  ; parse the string and split at the spaces
-  let iter n-values length msg [ ? ] 
-  foreach iter [
-    if item ? msg = "[" or item ? msg = "]" or item ? msg = " " [
-      let var substring msg (start_id + 1) (cur_id + 1)
-      if length var > 0 [
-        set l lput var l 
-      ]
-      set start_id ?
-    ]
-    set cur_id ?
-  ]
-    
-  ; cast to ints
-  set l map [ read-from-string ? ] l
-  
-  ; put in lists. This depends on routelength
-  let n_stations (length l - 2) / 4
-  set iter n-values n_stations [ ? ] 
-  set l2 lput item 0 l l2
-  set l2 lput item 1 l l2
-  foreach iter [
-    let route []
-    set route lput item (2 + ? * 4) l route
-    set route lput item (3 + ? * 4) l route
-    set route lput item (4 + ? * 4) l route
-    set route lput item (5 + ? * 4) l route
-    set l2 lput route l2
-  ]
-  
-  report l2
-end
-
-to-report get_route_from_msg [ msg ]
-    ; this function assumes the message to have already been parsed
-    ; list containing [target_station pickup dropoff utility] or [ [target_station pickup dropoff]*steps_ahead utility ]
-    let steps-ahead 1
-    let util_id steps-ahead * 3 
-    
-    let max_util 0
-    let route -1
-    let n length msg - 2
-    let iter n-values n [ ? + 2 ]
-    
-    foreach iter [
-      let station_info item ? msg
-       if item util_id station_info > max_util [
-         set max_util item util_id station_info
-         set route item 0 station_info
-       ]
-      ]  
-    
-    report route
-end
-
-to communicate
-  ; decide whether to communicate
-  if next_stop < 0 [ ; if you don't have a route yet, communicate your intentions with others
-    let msg_str construct_outgoing_message
-    let n_bus count buses
-    let bus_ids n-values n_bus [ ? + 24 ]
-    foreach bus_ids [
-      if ? != bus_id [
-        send-message ? msg_str
-      ]
-    ]
-  ]
-  
-  foreach inbox [
-    ; can we remove stuff from the inbox?
-    let t item 0 ?
-    if t = ticks - 1 [
-      let sender_id item 1 ?
-      let msg_str item 2 ?
-      let msg parse_msg msg_str
-      let route get_route_from_msg msg
-      
-      ;show msg
-      ;show "I" 
-      ;show bus_id 
-      ;show "see that" 
-      ;show sender_id 
-      ;show "wants to go to" 
-      ;show route
-    ]
-  ]
-  
-end
+;to-report parse_msg [ msg ]
+;  ; from a message string, get the relevant info
+;  let start_id 0
+;  let cur_id 0
+;  let l []
+;  let l2 []
+;    
+;  ; parse the string and split at the spaces
+;  let iter n-values length msg [ ? ] 
+;  foreach iter [
+;    if item ? msg = "[" or item ? msg = "]" or item ? msg = " " [
+;      let var substring msg (start_id + 1) (cur_id + 1)
+;      if length var > 0 [
+;        set l lput var l 
+;      ]
+;      set start_id ?
+;    ]
+;    set cur_id ?
+;  ]
+;    
+;  ; cast to ints
+;  set l map [ read-from-string ? ] l
+;  
+;  ; put in lists. This depends on routelength
+;  let n_stations (length l - 2) / 4
+;  set iter n-values n_stations [ ? ] 
+;  set l2 lput item 0 l l2
+;  set l2 lput item 1 l l2
+;  foreach iter [
+;    let route []
+;    set route lput item (2 + ? * 4) l route
+;    set route lput item (3 + ? * 4) l route
+;    set route lput item (4 + ? * 4) l route
+;    set route lput item (5 + ? * 4) l route
+;    set l2 lput route l2
+;  ]
+;  
+;  report l2
+;end
+;
+;to-report get_route_from_msg [ msg ]
+;    ; this function assumes the message to have already been parsed
+;    ; list containing [target_station pickup dropoff utility] or [ [target_station pickup dropoff]*steps_ahead utility ]
+;    let steps-ahead 1
+;    let util_id steps-ahead * 3 
+;    
+;    let max_util 0
+;    let route -1
+;    let n length msg - 2
+;    let iter n-values n [ ? + 2 ]
+;    
+;    foreach iter [
+;      let station_info item ? msg
+;       if item util_id station_info > max_util [
+;         set max_util item util_id station_info
+;         set route item 0 station_info
+;       ]
+;      ]  
+;    
+;    report route
+;end
+;
+;to communicate
+;  ; decide whether to communicate
+;  if next_stop < 0 [ ; if you don't have a route yet, communicate your intentions with others
+;    let msg_str construct_outgoing_message
+;    let n_bus count buses
+;    let bus_ids n-values n_bus [ ? + 24 ]
+;    foreach bus_ids [
+;      if ? != bus_id [
+;        send-message ? msg_str
+;      ]
+;    ]
+;  ]
+;  
+;  foreach inbox [
+;    ; can we remove stuff from the inbox?
+;    let t item 0 ?
+;    if t = ticks - 1 [
+;      let sender_id item 1 ?
+;      let msg_str item 2 ?
+;      let msg parse_msg msg_str
+;      let route get_route_from_msg msg
+;      
+;      ;show msg
+;      ;show "I" 
+;      ;show bus_id 
+;      ;show "see that" 
+;      ;show sender_id 
+;      ;show "wants to go to" 
+;      ;show route
+;    ]
+;  ] 
+; end
