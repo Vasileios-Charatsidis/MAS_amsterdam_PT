@@ -140,17 +140,24 @@ to-report choose-next-bus-stop
 
 end
 
+
+;TODO has_plan = list of id`s of people who have a plan
+;has_plan list of lists , index indicates bus stop
+;assumes has_plan is global
+
 to-report utility_for_stop [ bus_stop ]
   ; Compute the utility for a bus stop
   ; Args:
   ;   @bus_stop
   ; Return:
   ;   @utility
-
+  
+  
   let capacity bus-capacity
 
   ; Free spaces in the bus
   let free_spaces free-spaces-on-bus
+  
 
   ; 'Droppable' passengers in the potential next bus stop
   let dropoffs 0
@@ -162,11 +169,35 @@ to-report utility_for_stop [ bus_stop ]
   
   ; alpha
   let alpha free_spaces / capacity
-
+  
+  ; set number of passengers at stop to number of passengers without a plan
+  let number_have_plan length has_plan item bus_stop
+  let number_at_stop passenger-count-at-bus-stop bus_stop - number_have_plan
+  
   ; Potential pick ups
-  let pickups min list passenger-count-at-bus-stop bus_stop free_spaces
+  let potential_pickups min list number_at_stop free_spaces
+  
+  ; count overlapping destinations
+  let overlapp 0
+  foreach bus_passengers [
+    let passenger_destination item 1 ?
+    foreach get-passengers-at-stop [bus_stop] [
+      if item 2 ? = passenger_destination [
+       set overlapp overlapp + 1
+     ]
+    ]
+    
+     if item 1 ? = bus_stop [
+       set dropoffs dropoffs + 1
+     ]
+  ]
+  
+  
+  ; set pickups to mean of possible pickups and number of passengers with same destination as the ones onboard
+  ; only do this if the bus is not empty?
+  let pickups mean list potential_pickups pass_same_destination
 
-  let utility_value (1 - alpha) * dropoffs + alpha * pickups
+  let utility_value (1 - alpha) * dropoffs + alpha * pickups 
   report utility_value
 
 end
