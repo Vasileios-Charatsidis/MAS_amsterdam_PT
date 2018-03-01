@@ -11,7 +11,9 @@ buses-own [
   previous_stop   ; ID of the last bus stop that the agent (bus) visited (-1 means that the agent has not visited any bus stop yet).
   current_stop    ; ID of the bus stop where the agent (bus) currently is (-1 means that the agent is not at any bus stop).
   next_stop       ; ID of the bus stop the agent (bus) is traveling to (-1 means that the agent is not travelling to any bus stop).
+  dropoff_intent  ; ID's of the passengers for which this bus has plans
   has_plan        ; ID's of passengers for which another bus already has a plan, passengers that don't need to be picked up by you. list of lists. list per bus stop
+  dropped_off     ; ID's of the passengers that have been dropped of since the last sent message
 
   ; local variables
   add_buses       ; if true, add buses
@@ -39,6 +41,10 @@ end
 to execute-actions
   ; Add decision making strategies for your agents here.
   ; You are allowed to use the global variable 'ticks'.
+  
+  ; temporary code  
+  ; set has_plan [[105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105]]
+  ; set dropoff_intent [105]
 
   if add_buses = 0 [
     let n 60
@@ -49,38 +55,26 @@ to execute-actions
      ]
     ]
   ]
-  ; if bus_id = 24 or bus_id = 25 or bus_id = 26 or bus_id = 27 or
-   ;   bus_id = 28 or bus_id = 29 or bus_id = 30 or bus_id = 31 or
-  ;    bus_id = 32 or bus_id = 33 or bus_id = 34 [
-  ;   add-bus 1 set add_buses 1
- ;  ]
- ; ]
-
-  ;show "---------------------------------"
 
   if current_stop > -1 [
-    ;show (word "Current stop: " current_stop)
-
     foreach bus_passengers [
-      if item 1 ? = current_stop [ drop-off-passenger item 0 ? ]
+      if item 1 ? = current_stop [ 
+        let pass_id item 0 ?
+        drop-off-passenger pass_id
+        set dropped_off lput pass_id dropped_off ; save info that we've dropped off this passenger so that we can tell the other busses to forget this info come next message. This will prevent blowing up the size of the has_plan list
+      ]
     ]
 
     let free_spaces free-spaces-on-bus
-
     if free_spaces > 0 [
       let pass_here map [ item 0 ? ] get-passengers-at-stop current_stop
-      
       ; Only pickup free_spaces number of passengers
       repeat min list free_spaces length pass_here [
-
         pick-up-passenger item random length pass_here pass_here
         set free_spaces free_spaces - 1
       ]
-
       foreach pass_here [ pick-up-passenger ? ]
     ]
-
-   ; show (word "Passengers that are now on the bus: " bus_passengers)
 
     ; check if passenger is on route otherwise take other bus.
     ; change-passenger-destination-to-centraal
@@ -88,10 +82,9 @@ to execute-actions
     set next_stop choose-next-bus-stop
   ]
 
-  ;show (word "Next stop: " next_stop)
   travel-to next_stop
   
-  ;communicate
+  ; communicate
 
 end
 
@@ -152,7 +145,6 @@ to-report utility_for_stop [ bus_stop ]
   ; Return:
   ;   @utility
   
-  
   let capacity bus-capacity
 
   ; Free spaces in the bus
@@ -184,157 +176,150 @@ to-report utility_for_stop [ bus_stop ]
     foreach get-passengers-at-stop [bus_stop] [
       if item 2 ? = passenger_destination [
        set overlapp overlapp + 1
-     ]
+      ]
     ]
-    
-     if item 1 ? = bus_stop [
-       set dropoffs dropoffs + 1
-     ]
+    if item 1 ? = bus_stop [
+      set dropoffs dropoffs + 1
+    ]
   ]
-  
   
   ; set pickups to mean of possible pickups and number of passengers with same destination as the ones onboard
   ; only do this if the bus is not empty?
   let pickups mean list potential_pickups pass_same_destination
-
   let utility_value (1 - alpha) * dropoffs + alpha * pickups 
   report utility_value
-
 end
 
-; the below needs to  change
+to-report construct_outgoing_message
+  ; after the flag "p" come the passengers for which this bus has plans. Other buses don't need to consider helping them
+  ; after the flag "d" come the passengers that have been dropped of since the last message
+  ; [ "p 105 106 110 d 98 100 " ]
+  
+  let msg ["p"]
+  foreach dropoff_intent [
+    set msg lput ? msg  
+  ]
+  set msg lput "d" msg
+  foreach dropped_off [
+    set msg lput ? msg
+  ]
+  set dropped_off [] ; forget from memory to prevent blowing up the size of this variable
+  
+  set msg lput " " msg
+  report (word msg)  
+end
 
-;to-report construct_outgoing_message 
-;  ; constructs a message to other busses saying what the possible routes are this bus can take, what it can do at the stops and what its utility is
-;  ; "bus_id current_station target_station pickup dropoff utility target_station pickup dropoff utility"
-;   
-;  let msg []
-;  let ground_stop -1 ; if you are on the way to station 5 (you don't cross any other stations), you may pretend that you are sending your message from there
-;  
-;  ifelse current_stop > -1 [
-;    set ground_stop current_stop
-;  ][
-;    set ground_stop next_stop
-;  ]
-;  
-;  let connecting_nodes item ground_stop graph
-;   
-;  let free_spaces free-spaces-on-bus
-;  
-;  set msg lput bus_id msg
-;  set msg lput ground_stop msg
-;  
-;  foreach connecting_nodes [   
-;    let stations_info [] ; list containing [target_station pickup dropoff utility] or [ [target_station pickup dropoff]*steps_ahead utility ]
-;    let pickups min list passenger-count-at-bus-stop ? free_spaces
-;    let dropoffs 0
-;    foreach bus_passengers [
-;     if item 1 ? = current_stop [
-;       set dropoffs dropoffs + 1
-;      ]
-;    ]
-;    let u utility_for_stop ?  
-;    set stations_info lput ? stations_info  
-;    set stations_info lput pickups stations_info
-;    set stations_info lput dropoffs stations_info
-;    set stations_info lput u stations_info
-;    set msg lput stations_info msg
-;  ]
-;
-;  report (word msg)
-;end
+to digest_msg [ msg ]
+  ; get which passengers are to be added to has_plan and which can be forgotten
+  
+  ; initialise variables
+  let l []
+  let start_id 0
+  let cur_id 0
+  
+  let split_idx position "d" msg  
+  let msg_p substring msg 0  split_idx ; message on passengers for which there is a plan
+  let msg_d substring msg split_idx length msg ; message on passengers that have been dropped off by other buses
+  
+;  show "variable has_plan before digesting the message"
+;  show has_plan
 
-;to-report parse_msg [ msg ]
-;  ; from a message string, get the relevant info
-;  let start_id 0
-;  let cur_id 0
-;  let l []
-;  let l2 []
-;    
-;  ; parse the string and split at the spaces
-;  let iter n-values length msg [ ? ] 
-;  foreach iter [
-;    if item ? msg = "[" or item ? msg = "]" or item ? msg = " " [
-;      let var substring msg (start_id + 1) (cur_id + 1)
-;      if length var > 0 [
-;        set l lput var l 
-;      ]
-;      set start_id ?
-;    ]
-;    set cur_id ?
-;  ]
-;    
-;  ; cast to ints
-;  set l map [ read-from-string ? ] l
-;  
-;  ; put in lists. This depends on routelength
-;  let n_stations (length l - 2) / 4
-;  set iter n-values n_stations [ ? ] 
-;  set l2 lput item 0 l l2
-;  set l2 lput item 1 l l2
-;  foreach iter [
-;    let route []
-;    set route lput item (2 + ? * 4) l route
-;    set route lput item (3 + ? * 4) l route
-;    set route lput item (4 + ? * 4) l route
-;    set route lput item (5 + ? * 4) l route
-;    set l2 lput route l2
-;  ]
-;  
-;  report l2
-;end
-;
-;to-report get_route_from_msg [ msg ]
-;    ; this function assumes the message to have already been parsed
-;    ; list containing [target_station pickup dropoff utility] or [ [target_station pickup dropoff]*steps_ahead utility ]
-;    let steps-ahead 1
-;    let util_id steps-ahead * 3 
-;    
-;    let max_util 0
-;    let route -1
-;    let n length msg - 2
-;    let iter n-values n [ ? + 2 ]
-;    
-;    foreach iter [
-;      let station_info item ? msg
-;       if item util_id station_info > max_util [
-;         set max_util item util_id station_info
-;         set route item 0 station_info
-;       ]
-;      ]  
-;    
-;    report route
-;end
-;
-;to communicate
-;  ; decide whether to communicate
-;  if next_stop < 0 [ ; if you don't have a route yet, communicate your intentions with others
-;    let msg_str construct_outgoing_message
-;    let n_bus count buses
-;    let bus_ids n-values n_bus [ ? + 24 ]
-;    foreach bus_ids [
-;      if ? != bus_id [
-;        send-message ? msg_str
-;      ]
-;    ]
-;  ]
-;  
-;  foreach inbox [
-;    ; can we remove stuff from the inbox?
-;    let t item 0 ?
-;    if t = ticks - 1 [
-;      let sender_id item 1 ?
-;      let msg_str item 2 ?
-;      let msg parse_msg msg_str
-;      let route get_route_from_msg msg
-;      
-;      ;show msg
-;      ;show "I" 
-;      ;show bus_id 
-;      ;show "see that" 
-;      ;show sender_id 
-;      ;show "wants to go to" 
-;      ;show route
-;    ]
-;  ] 
-; end
+  ; read the part of the message about passengers that have been dropped of
+  let iter n-values length msg_d [ ? ] 
+  foreach iter [
+    if item ? msg_d = "d" or item ? msg_d = " " [
+      let var substring msg_d (start_id + 1) (cur_id + 1)
+      if length var > 0 [
+        set l lput var l 
+      ]
+      set start_id ?
+    ]
+    set cur_id ?
+  ]
+  set l map [ read-from-string ? ] l
+  
+  ; remove passengers that have been dropped off from the variable has_plan
+  let i 0
+  foreach has_plan [
+    let has_plan_here ? 
+    foreach l [
+      if member? ? has_plan_here [
+        let idx position ? has_plan_here
+        set has_plan_here remove-item idx has_plan_here
+      ]
+      set has_plan replace-item i has_plan has_plan_here
+      set i ( i + 1 )
+    ]
+  ]    
+  ; read the part of the message about passengers for which there is a plan
+  set l []
+  set start_id 0
+  set cur_id 0
+  set iter n-values length msg_p [ ? ] 
+  foreach iter [
+    if item ? msg_p = "p" or item ? msg_p = " " [
+      let var substring msg (start_id + 1) (cur_id + 1)
+      if length var > 0 [
+        set l lput var l 
+      ]
+      set start_id ?
+    ]
+    set cur_id ?
+  ]
+  set l map [ read-from-string ? ] l
+  
+  ; add passengers for which there is a plan to the variable has_plan
+  set iter n-values 24 [ ? ]
+  foreach iter [
+    let bus_stop ?
+    let pass get-passengers-at-stop bus_stop
+    foreach l [
+      if member_nested_list ? pass [ ; will be "false" if this passenger is not part of the list pass
+        let has_plan_here (item bus_stop has_plan)
+        set has_plan_here lput ? has_plan_here
+        set has_plan replace-item bus_stop has_plan has_plan_here
+      ]
+    ]
+  ]
+  
+;  show "variable has_plan after digesting the message"
+;  show has_plan
+  
+end
+
+to communicate
+  
+  ; send
+  ; TO DO condition for when to construct an outgoing message
+  if true [ 
+    let msg_str construct_outgoing_message
+    let n_bus count buses
+    let bus_ids n-values n_bus [ ? + 24 ]
+    foreach bus_ids [
+      if ? != bus_id [
+        send-message ? msg_str
+      ]
+    ]
+  ]
+  
+  ; read
+  foreach inbox [
+    ; can we remove stuff from the inbox?
+    let t item 0 ?
+    if t = ticks - 1 [
+      let sender_id item 1 ?
+      let msg item 2 ?
+      digest_msg msg     
+    ]
+  ] 
+ end
+
+to-report member_nested_list [ i l ]
+  let bool false
+  foreach l [
+    if member? i ? [
+      set bool true
+    ]
+  ]
+  report bool
+end
