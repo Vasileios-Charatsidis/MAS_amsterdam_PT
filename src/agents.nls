@@ -60,7 +60,7 @@ to execute-actions
 
     if free_spaces > 0 [
       let pass_here map [ item 0 ? ] get-passengers-at-stop current_stop
-      
+
       ; Only pickup free_spaces number of passengers
       repeat min list free_spaces length pass_here [
 
@@ -94,17 +94,18 @@ to-report choose-next-bus-stop
   ; Get the connecting nodes of the current bus stop
   let connecting_nodes item current_stop graph
 
+  let levels 2  ; hyper-parameter
   let utilities []
   let max_utility -1000
 
   foreach connecting_nodes [
     ; Get the utility for each of the connecting nodes
-    let u utility_for_stop ?
- 
+    let u utility_for_stop ? 2
+
     if u > max_utility [
       set max_utility u
     ]
- 
+
     set utilities lput u utilities
   ]
 
@@ -130,12 +131,18 @@ to-report choose-next-bus-stop
 end
 
 
-to-report utility_for_stop [ bus_stop ]
+to-report utility_for_stop [ bus_stop level ]
   ; Compute the utility for a bus stop
   ; Args:
   ;   @bus_stop
+  ;   @level - denotes the level of recursion. It is a hyper parameter
   ; Return:
   ;   @utility
+
+  ; recursion base condition
+  if level = 0 [
+    report 0
+  ]
 
   let capacity bus-capacity
 
@@ -149,7 +156,7 @@ to-report utility_for_stop [ bus_stop ]
        set dropoffs dropoffs + 1
      ]
   ]
-  
+
   ; alpha
   let alpha free_spaces / capacity
 
