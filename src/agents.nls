@@ -140,30 +140,30 @@ to-report utility_for_stop [ bus_stop level ]
   ;   @utility
 
   ; recursion base condition
-  if level = 0 [
-    report 0
+  if level = 1 [
+    let capacity bus-capacity
+
+    ; Free spaces in the bus
+    let free_spaces free-spaces-on-bus
+
+    ; 'Droppable' passengers in the potential next bus stop
+    let dropoffs 0
+    foreach bus_passengers [
+       if item 1 ? = bus_stop [
+         set dropoffs dropoffs + 1
+       ]
+    ]
+
+    ; alpha
+    let alpha free_spaces / capacity
+
+    ; Potential pick ups
+    let pickups min list passenger-count-at-bus-stop bus_stop free_spaces
+
+    let utility_value (1 - alpha) * dropoffs + alpha * pickups
+    report utility_value
   ]
 
-  let capacity bus-capacity
 
-  ; Free spaces in the bus
-  let free_spaces free-spaces-on-bus
-
-  ; 'Droppable' passengers in the potential next bus stop
-  let dropoffs 0
-  foreach bus_passengers [
-     if item 1 ? = bus_stop [
-       set dropoffs dropoffs + 1
-     ]
-  ]
-
-  ; alpha
-  let alpha free_spaces / capacity
-
-  ; Potential pick ups
-  let pickups min list passenger-count-at-bus-stop bus_stop free_spaces
-
-  let utility_value (1 - alpha) * dropoffs + alpha * pickups
-  report utility_value
 
 end
