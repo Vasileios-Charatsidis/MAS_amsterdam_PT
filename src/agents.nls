@@ -14,6 +14,8 @@ buses-own [
 
   ; local variables
   add_buses       ; if true, add buses
+  levels          ; hyperparameter for the depth of the graph
+  known_route     ; Assessed route for this bus (with respect to levels hyperparam)
 ]
 
 
@@ -31,6 +33,9 @@ to init-buses
               [2 6 9] [3 8 20] [4 5 17 13 21] [1 16 17] [20 15 22] [7 10 22 23] [0 23] [0 12 18]
               [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]
   ]
+  
+  set levels 8
+  set known_route []
 
 end
 
@@ -76,7 +81,17 @@ to execute-actions
     ; check if passenger is on route otherwise take other bus.
     ; change-passenger-destination-to-centraal
 
-    set next_stop choose-next-bus-stop
+    ; Check if there is a route available
+    ; if not, calculate the route
+    if length known_route = 0 [
+      
+      ;show "know_route is empty"
+
+      set known_route choose-next-bus-stop
+    ]
+
+    set next_stop item 0 known_route
+    set known_route but-first known_route  ; remove the first element of the known_route
   ]
 
   show (word "Next stop: " next_stop)
@@ -85,28 +100,50 @@ to execute-actions
 end
 
 
-to-report choose-next-bus-stop
-  ; From the current bus stop, choose the next bus stop to visit
-  ; Currently we choose the bus stop with the maximum number of passengers
-  ; return:
-  ;  @ next_stop
+to-report utility_recursion [ bus_stop level ]
+  ; Utility recursion function
+  ; Args:
+  ;   @bus_stop
+  ;   @level: level of recursion
+  ;
+  ; Return:
+  ;   @max of utility
 
-  ; Get the connecting nodes of the current bus stop
-  let connecting_nodes item current_stop graph
+  ; recursion base step
+  if level <= 0 [
+    ;show "recursion level is 0"
 
-  let levels 2  ; hyper-parameter
+    let report_value []
+    set report_value lput [] report_value
+    set report_value lput 0 report_value
+    report report_value
+  ]
+  
+  ;show (word "current bus stop and level: " bus_stop ", " level)
+
+  ; get connecting nodes
+  let connecting_nodes item bus_stop graph
+  
   let utilities []
+  let routes_1 []
   let max_utility -1000
 
   foreach connecting_nodes [
-    ; Get the utility for each of the connecting nodes
-    let u utility_for_stop ? 2
+    ; Get the utility for each of the connecting nodes, with level = level - 1 (recursion step)
+
+    ;wait 5
+
+    let return_list utility_recursion ? (level - 1)
+
+    let u item 1 return_list
+    set u u + actual_utility ?
 
     if u > max_utility [
       set max_utility u
     ]
 
     set utilities lput u utilities
+    set routes_1 lput item 0 return_list routes_1
   ]
 
   ; Get list of max_utilities. If there are multiple stations with the same
@@ -121,49 +158,67 @@ to-report choose-next-bus-stop
     set index index + 1
   ]
 
-  show (word "Connecting bus stops: " connecting_nodes)
-  show (word "Utilites for stops:   " utilities)
+  let select_node item random length max_utility_indices max_utility_indices  ; random bus_stop with the max utility
+  let chosen_route item select_node routes_1
+  set chosen_route lput item select_node connecting_nodes chosen_route
 
-  let select_node item random length max_utility_indices max_utility_indices
+  let report_list []
+  set report_list lput chosen_route report_list
+  set report_list lput max_utility report_list
 
-  report item select_node connecting_nodes
+;  show (word "Connecting bus stops: " connecting_nodes)
+;  show (word "Utilites for stops:   " utilities)
+;  show (word "Routes:               " routes_1)
+
+  report report_list
+end
+
+
+to-report actual_utility [ bus_stop ] 
+  ; Compute the utility on traveling to 'bus stop'
+  ; Args:
+  ;   @bus_stop
+  ; Return:
+  ;   @utility
+
+  let capacity bus-capacity
+
+  ; Free spaces in the bus
+  let free_spaces free-spaces-on-bus
+  
+  ; 'Droppable' passengers in the potential next bus stop
+  let dropoffs 0
+  foreach bus_passengers [
+    if item 1 ? = bus_stop [
+      set dropoffs dropoffs + 1
+    ]
+  ]
+
+  ; alpha
+  let alpha free_spaces / capacity
+
+  ; Potential pick ups
+  let pickups min list passenger-count-at-bus-stop bus_stop free_spaces
+  
+  let utility_value (1 - alpha) * dropoffs + alpha * pickups
+  report utility_value
 
 end
 
 
-to-report utility_for_stop [ bus_stop level ]
-  ; Compute the utility for a bus stop
-  ; Args:
-  ;   @bus_stop
-  ;   @level - denotes the level of recursion. It is a hyper parameter
-  ; Return:
-  ;   @utility
+to-report choose-next-bus-stop
+  ; From the current bus stop, choose the next bus stop to visit
+  ; Currently we choose the bus stop with the maximum number of passengers
+  ; return:
+  ;  @ next_stop
 
-  ; recursion base condition
-  if level = 1 [
-    let capacity bus-capacity
-
-    ; Free spaces in the bus
-    let free_spaces free-spaces-on-bus
-
-    ; 'Droppable' passengers in the potential next bus stop
-    let dropoffs 0
-    foreach bus_passengers [
-       if item 1 ? = bus_stop [
-         set dropoffs dropoffs + 1
-       ]
-    ]
-
-    ; alpha
-    let alpha free_spaces / capacity
-
-    ; Potential pick ups
-    let pickups min list passenger-count-at-bus-stop bus_stop free_spaces
-
-    let utility_value (1 - alpha) * dropoffs + alpha * pickups
-    report utility_value
-  ]
+  ; Get the connecting nodes of the current bus stop
 
 
+  let got_this reverse item 0 (utility_recursion current_stop levels)
+
+  show (word "got this" got_this)
+
+  report got_this
 
 end
