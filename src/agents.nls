@@ -14,6 +14,7 @@ buses-own [
   dropoff_intent  ; ID's of the passengers for which this bus has plans
   has_plan        ; ID's of passengers for which another bus already has a plan, passengers that don't need to be picked up by you. list of lists. list per bus stop
   dropped_off     ; ID's of the passengers that have been dropped of since the last sent message
+  planless_hist   ; The history of how many passengers were planless up to some amount of ticks in the past
 
   ; local variables
   add_buses       ; if true, add buses
@@ -22,6 +23,11 @@ buses-own [
 
 globals [
   graph
+  total_ticks_per_day
+  planless_threshold
+  need_thresh_1
+  need_thresh_2
+  need_thresh_3
 ]
 
 
@@ -34,6 +40,17 @@ to init-buses
               [2 6 9] [3 8 20] [4 5 17 13 21] [1 16 17] [20 15 22] [7 10 22 23] [0 23] [0 12 18]
               [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]
   ]
+  
+  ; hyperparameters of the algorithm
+  set total_ticks_per_day 1440
+  set planless_threshold 100
+  set need_thresh_1 0.0
+  set need_thresh_2 2.0
+  set need_thresh_3 5.0
+  
+  ; init of bus-own variables
+  set dropped_off []
+  set planless_hist n-values 10 [0]
 
 end
 
@@ -43,7 +60,8 @@ to execute-actions
   ; You are allowed to use the global variable 'ticks'.
   
   ; temporary code  
-  ; set has_plan [[105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105]]
+   set has_plan [[105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105]]
+   
   ; set dropoff_intent [105]
 
   ;if add_buses = 0 [
@@ -56,19 +74,33 @@ to execute-actions
     ;]
   ;]
   
-  let decision decide_add_bus 100
-  
-  if (bus_id = 24) and (decision = True)  [
-    
-     
-    
-    
-      add-bus 1
-      
-    
-    ]
 
+  ; decide whether to add a new bus this tick
+  if bus_id = 24 [ ; bus 24 is the 'president bus'
+    let var decide_add_bus planless_threshold
+    ; let decision item 0 var
+    let decision True
+    let planless item 1 var
+    set planless_hist lput planless but-first planless_hist
+    if (decision = True)  [
+      let need new_bus_need planless_hist
+      if need > need_thresh_1 [
+        ifelse need > need_thresh_2 [
+          ifelse need > need_thresh_3 [
+            add-bus 3
+          ][
+            add-bus 2
+          ]
+        ][
+          add-bus 1
+        ]
+      ]
+    ]
+  ]
+
+  ; if we've reached the station
   if current_stop > -1 [
+    ; drop-off passangers
     foreach bus_passengers [
       if item 1 ? = current_stop [ 
         let pass_id item 0 ?
@@ -77,46 +109,65 @@ to execute-actions
       ]
     ]
 
+    ; pick-up passengers
     let free_spaces free-spaces-on-bus
     if free_spaces > 0 [
       let pass_here map [ item 0 ? ] get-passengers-at-stop current_stop
       ; Only pickup free_spaces number of passengers
       repeat min list free_spaces length pass_here [
+        ; TO DO: smart pickup, only pick up passengers that we have defined in dropoff-intent
         pick-up-passenger item random length pass_here pass_here
         set free_spaces free_spaces - 1
       ]
       foreach pass_here [ pick-up-passenger ? ]
     ]
-
-    ; check if passenger is on route otherwise take other bus.
-    ; change-passenger-destination-to-centraal
-
     set next_stop choose-next-bus-stop
   ]
 
   travel-to next_stop
   
-  ; communicate
+  ; if route has been traveled, infer new route and dropoff-intent and communicate
+  ; we could consider to only read messages before planning a route or read in messages as soon as they are received, wouldn't matter
 
 end
 
+to-report new_bus_need [ history ]
+  ; the need for a bus is determined by how steeply the amount of planless passengers increased in the past few ticks
+  ; also influenced by the time of day, later in the day we'll be more hesitant to buy new busses
+  let discounted .8 ; the factor with which we want to multiply need at the end of the day
+  let angle linear_fit history
+  let time_factor 1 - (( ( 1 - discounted ) * ticks) / total_ticks_per_day )
+  report angle * time_factor
+end
+  
 
+to-report linear_fit [ l ]
+  let dt []
+  let iter n-values ( length l - 1 ) [?]
+  foreach iter [
+     set dt lput ( (item (? + 1) l - (item ? l) )) dt
+  ] 
+  let angle sum dt / length dt
+  report angle
+end
 
 to-report decide_add_bus [threshold] 
+  let decision False
   let total_waiting 0
-  let num_stations graph - 1
-  let stations n-values length num_stations [?] 
+  let num_stations length graph - 1
+  let stations n-values num_stations [?] 
   
   foreach stations [
-    set total_waiting total_waiting + get-passengers-at-stop ?
+    if length get-passengers-at-stop ? > 0 [
+    set total_waiting total_waiting + length item 0 get-passengers-at-stop ?
     ]
-  let decision total_waiting - length has_plan
-  
-  if decision > threshold [
-    report True
   ]
+  let planless total_waiting - length has_plan
   
-  report False
+  if planless > threshold [
+    set decision True
+  ]
+  report ( list decision planless )
   
 end
 

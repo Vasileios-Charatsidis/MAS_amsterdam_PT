@@ -691,7 +691,18 @@ to pick-up-passenger [passenger_id]
           ]
         ]
         [
-          show (word "WARNING: pick-up-passenger             :" "it is impossible to pick up this passenger:" passenger_id)
+;          show (bus-reached-bus-stop b_id passenger_bus_stop)
+;          show (l < c)
+;          show "n passengers now in bus"
+;          show l
+;          show "capacity"
+;          show c
+;          show (not is-boolean? pos)
+;          show (is-boolean? pos1)
+;          show (not pos1)
+;          show (not passenger_arrived?)
+;          show (passenger_destination != passenger_bus_stop)
+;          show (word "WARNING: pick-up-passenger             :" "it is impossible to pick up this passenger:" passenger_id)
         ]
       ]
     ]
