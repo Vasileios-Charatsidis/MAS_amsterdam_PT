@@ -46,15 +46,27 @@ to execute-actions
   ; set has_plan [[105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105]]
   ; set dropoff_intent [105]
 
-  if add_buses = 0 [
-    let n 60
-    let iter n-values n [ ? + 23 ]
-    foreach iter [
-     if bus_id = ? [
-     add-bus 1 set add_buses 1 
-     ]
+  ;if add_buses = 0 [
+   ; let n 60
+    ;let iter n-values n [ ? + 23 ]
+    ;foreach iter [
+   ; if bus_id = ? [
+    ; add-bus 1 set add_buses 1 
+     ;]
+    ;]
+  ;]
+  
+  let decision decide_add_bus 100
+  
+  if (bus_id = 24) and (decision = True)  [
+    
+     
+    
+    
+      add-bus 1
+      
+    
     ]
-  ]
 
   if current_stop > -1 [
     foreach bus_passengers [
@@ -88,6 +100,25 @@ to execute-actions
 
 end
 
+
+
+to-report decide_add_bus [threshold] 
+  let total_waiting 0
+  let num_stations graph - 1
+  let stations n-values length num_stations [?] 
+  
+  foreach stations [
+    set total_waiting total_waiting + get-passengers-at-stop ?
+    ]
+  let decision total_waiting - length has_plan
+  
+  if decision > threshold [
+    report True
+  ]
+  
+  report False
+  
+end
 
 to-report choose-next-bus-stop
   ; From the current bus stop, choose the next bus stop to visit
