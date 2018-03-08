@@ -21,10 +21,10 @@ end
 to-report bus-capacity
   ; Return:
   ;   @capacity: the capacity of the bus based on its type
-  
+
   let capacity 0
-  
-  ifelse bus_type = 1 [ 
+
+  ifelse bus_type = 1 [
     set capacity 12
   ] [
     ifelse bus_type = 2 [
@@ -37,7 +37,7 @@ to-report bus-capacity
   report capacity
 
 end
-  
+
 
 to-report free-spaces-on-bus
   ; Compute the number of free spaces on the bus
@@ -50,32 +50,12 @@ to-report free-spaces-on-bus
 end
 
 
-to change-passenger-destination-to-centraal
-  ; DEPRECATED
-  ; If the picked up passenger's destination is not on the bus-route,
-  ; then drop off the passenger at centraal station
-
-  ; TODO: Revisit this. There should be a smarter way.
-  let temp_list []
-
-  foreach bus_passengers [
-    let temp_passenger ?
-
-    ; FIXME: Logic Changed - routing is not defined anymore
-    ; let pos1 position item 1 temp_passenger routing
-    let pos1 9
-
-    ; show word "routing: " routing
-    ; show word "position: " pos1
-
-    if (is-boolean? pos1) and (not pos1) [
-      set temp_passenger replace-item 1 temp_passenger 3  ; drop the passenger at Centraal station
+to-report member_nested_list [ i l ]
+  let bool false
+  foreach l [
+    if member? i ? [
+      set bool true
     ]
-
-    set temp_list lput temp_passenger temp_list
   ]
-  set bus_passengers temp_list
-
+  report bool
 end
-  
-  

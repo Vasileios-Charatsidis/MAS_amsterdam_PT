@@ -1,4 +1,6 @@
-__includes ["helper.nls"]
+__includes ["helper.nls" "bus_need.nls" "messaging.nls"]
+;__includes ["bus_need.nls"]
+;__includes ["messaging.nls"]
 
 buses-own [
   ; Static, read-only variables. These values never change. You can read them, but you cannot change them.
@@ -16,6 +18,16 @@ buses-own [
   add_buses       ; if true, add buses
   levels          ; hyperparameter for the depth of the graph
   known_route     ; Assessed route for this bus (with respect to levels hyperparam)
+  dropoff_intent  ; ID's of the passengers for which this bus has plans
+  has_plan        ; ID's of passengers for which another bus already has a plan, passengers that don't need to be picked up by you. list of lists. list per bus stop
+  dropped_off     ; ID's of the passengers that have been dropped of since the last sent message
+  planless_hist   ; The history of how many passengers were planless up to some amount of ticks in the past
+
+  total_ticks_per_day
+  planless_threshold
+  need_thresh_1
+  need_thresh_2
+  need_thresh_3
 ]
 
 
@@ -34,8 +46,19 @@ to init-buses
               [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]
   ]
 
-  set levels 4
   set known_route []
+
+  ; hyperparameters of the algorithm
+  set levels 4
+  set total_ticks_per_day 1440
+  set planless_threshold 100
+  set need_thresh_1 0.0
+  set need_thresh_2 2.0
+  set need_thresh_3 5.0
+
+  ; init of bus-own variables
+  set dropped_off []
+  set planless_hist n-values 10 [0]
 
 end
 
@@ -44,23 +67,41 @@ to execute-actions
   ; Add decision making strategies for your agents here.
   ; You are allowed to use the global variable 'ticks'.
 
-  if add_buses = 0 [
-   if bus_id = 24 or bus_id = 25 or bus_id = 26 or bus_id = 27 or
-      bus_id = 28 or bus_id = 29 or bus_id = 30 or bus_id = 31 or
-      bus_id = 32 or bus_id = 33 or bus_id = 34 or bus_id = 35 or
-      bus_id = 36 or bus_id = 37 or bus_id = 38 or bus_id = 39 or
-      bus_id = 40 or bus_id = 41 or bus_id = 42 or bus_id = 43 or
-      bus_id = 44 or bus_id = 45 or bus_id = 46 or bus_id = 47 or
-      bus_id = 48 or bus_id = 49 or bus_id = 50 or bus_id = 51 or
-      bus_id = 52 or bus_id = 53 or bus_id = 54 or bus_id = 55 [
-     add-bus 1 set add_buses 1
+  ; temporary code
+   set has_plan [[105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105]]
+
+   if length inbox > 0 [
+     show inbox
    ]
+
+
+  ; decide whether to add a new bus this tick
+  if bus_id = 24 [ ; bus 24 is the 'president bus'
+    let var decide_add_bus planless_threshold
+    ; let decision item 0 var
+    let decision True
+    let planless item 1 var
+    set planless_hist lput planless but-first planless_hist
+    if (decision = True)  [
+      let need new_bus_need planless_hist
+      if need > need_thresh_1 [
+        ifelse need > need_thresh_2 [
+          ifelse need > need_thresh_3 [
+            add-bus 3
+          ][
+            add-bus 2
+          ]
+        ][
+          add-bus 1
+        ]
+      ]
+    ]
   ]
 
-  show "---------------------------------"
+  ; show "---------------------------------"
 
   if current_stop > -1 [
-    show (word "Current stop: " current_stop)
+    ; show (word "Current stop: " current_stop)
 
     foreach bus_passengers [
       if item 1 ? = current_stop [ drop-off-passenger item 0 ? ]
@@ -79,25 +120,29 @@ to execute-actions
       ]
     ]
 
-    show (word "Passengers that are now on the bus: " bus_passengers)
-
     ; Check if there is a route available
     ; if not, calculate the route
     if length known_route = 0 [
-      set known_route reverse item 0 (choose-next-bus-stop current_stop levels)
+      ; TODO
+      ; 1. read inbox
+      ; 2. calculate new route
+      ; 3. send message
+
+      set known_route reverse item 0 (choose_next_station current_stop levels)
+      communicate
     ]
 
     set next_stop item 0 known_route
     set known_route but-first known_route  ; remove the first element of the known_route
   ]
 
-  show (word "Next stop: " next_stop)
+  ; show (word "Next stop: " next_stop)
   travel-to next_stop
 
 end
 
 
-to-report choose-next-bus-stop [ bus_stop level ]
+to-report choose_next_station [ bus_stop level ]
   ; Utility recursion function
   ; Args:
   ;   @bus_stop
@@ -124,7 +169,7 @@ to-report choose-next-bus-stop [ bus_stop level ]
 
   foreach connecting_nodes [
     ; Get the utility for each of the connecting nodes, with level = level - 1
-    let return_list choose-next-bus-stop ? (level - 1)  ; (recursion step)
+    let return_list choose_next_station ? (level - 1)  ; (recursion step)
 
     let u item 1 return_list
     set u u + actual_utility ?
@@ -176,17 +221,35 @@ to-report actual_utility [ bus_stop ]
   ; 'Droppable' passengers in the potential next bus stop
   let dropoffs 0
   foreach bus_passengers [
-    if item 1 ? = bus_stop [
-      set dropoffs dropoffs + 1
-    ]
+     if item 1 ? = bus_stop [
+       set dropoffs dropoffs + 1
+     ]
   ]
 
   ; alpha
   let alpha free_spaces / capacity
 
-  ; Potential pick ups
-  let pickups min list passenger-count-at-bus-stop bus_stop free_spaces
+  ; set number of passengers at stop to number of passengers without a plan
+  let number_have_plan length item bus_stop has_plan
+  let number_at_stop passenger-count-at-bus-stop bus_stop - number_have_plan
 
+  ; Potential pick ups
+  let potential_pickups min list number_at_stop free_spaces
+
+  ; count overlapping destinations
+  let overlapp 0
+  foreach bus_passengers [
+    let passenger_destination item 1 ?
+    foreach get-passengers-at-stop bus_stop [
+      if item 1 ? = passenger_destination [
+       set overlapp overlapp + 1
+      ]
+    ]
+  ]
+
+  ; set pickups to mean of possible pickups and number of passengers with same destination as the ones onboard
+  ; only do this if the bus is not empty?
+  let pickups mean list potential_pickups overlapp
   let utility_value (1 - alpha) * dropoffs + alpha * pickups
   report utility_value
 

@@ -1,0 +1,41 @@
+to-report new_bus_need [ history ]
+  ; the need for a bus is determined by how steeply the amount of planless passengers increased in the past few ticks
+  ; also influenced by the time of day, later in the day we'll be more hesitant to buy new busses
+  
+
+  let discounted .8 ; the factor with which we want to multiply need at the end of the day
+  let angle linear_fit history
+  let time_factor 1 - (( ( 1 - discounted ) * ticks) / total_ticks_per_day )
+  report angle * time_factor
+end
+
+
+to-report linear_fit [ l ]
+  let dt []
+  let iter n-values ( length l - 1 ) [?]
+  foreach iter [
+     set dt lput ( (item (? + 1) l - (item ? l) )) dt
+  ]
+  let angle sum dt / length dt
+  report angle
+end
+
+to-report decide_add_bus [threshold]
+  let decision False
+  let total_waiting 0
+  let num_stations length graph - 1
+  let stations n-values num_stations [?]
+
+  foreach stations [
+    if length get-passengers-at-stop ? > 0 [
+    set total_waiting total_waiting + length item 0 get-passengers-at-stop ?
+    ]
+  ]
+  let planless total_waiting - length has_plan
+
+  if planless > threshold [
+    set decision True
+  ]
+  report ( list decision planless )
+
+end

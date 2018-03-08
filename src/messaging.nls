@@ -1,0 +1,122 @@
+to-report construct_outgoing_message
+  ; after the flag "p" come the passengers for which this bus has plans. Other buses don't need to consider helping them
+  ; after the flag "d" come the passengers that have been dropped of since the last message
+  ; [ "p 105 106 110 d 98 100 " ]
+
+  let msg ["p"]
+  foreach dropoff_intent [
+    set msg lput ? msg
+  ]
+  set msg lput "d" msg
+  foreach dropped_off [
+    set msg lput ? msg
+  ]
+  set dropped_off [] ; forget from memory to prevent blowing up the size of this variable
+
+  set msg lput " " msg
+  report (word msg)
+end
+
+to digest_msg [ msg ]
+  ; get which passengers are to be added to has_plan and which can be forgotten
+  ; Args
+  ;   @msg
+
+  ; initialise variables
+  let l []
+  let start_id 0
+  let cur_id 0
+
+  let split_idx position "d" msg
+  let msg_p substring msg 0  split_idx ; message on passengers for which there is a plan
+  let msg_d substring msg split_idx length msg ; message on passengers that have been dropped off by other buses
+
+;  show "variable has_plan before digesting the message"
+;  show has_plan
+
+  ; read the part of the message about passengers that have been dropped of
+  let iter n-values length msg_d [ ? ]
+  foreach iter [
+    if item ? msg_d = "d" or item ? msg_d = " " [
+      let var substring msg_d (start_id + 1) (cur_id + 1)
+      if length var > 0 [
+        set l lput var l
+      ]
+      set start_id ?
+    ]
+    set cur_id ?
+  ]
+  set l map [ read-from-string ? ] l
+
+  ; remove passengers that have been dropped off from the variable has_plan
+  let i 0
+  foreach has_plan [
+    let has_plan_here ?
+    foreach l [
+      if member? ? has_plan_here [
+        let idx position ? has_plan_here
+        set has_plan_here remove-item idx has_plan_here
+      ]
+      set has_plan replace-item i has_plan has_plan_here
+      set i ( i + 1 )
+    ]
+  ]
+  ; read the part of the message about passengers for which there is a plan
+  set l []
+  set start_id 0
+  set cur_id 0
+  set iter n-values length msg_p [ ? ]
+  foreach iter [
+    if item ? msg_p = "p" or item ? msg_p = " " [
+      let var substring msg (start_id + 1) (cur_id + 1)
+      if length var > 0 [
+        set l lput var l
+      ]
+      set start_id ?
+    ]
+    set cur_id ?
+  ]
+  set l map [ read-from-string ? ] l
+
+  ; add passengers for which there is a plan to the variable has_plan
+  set iter n-values 24 [ ? ]
+  foreach iter [
+    let bus_stop ?
+    let pass get-passengers-at-stop bus_stop
+    foreach l [
+      if member_nested_list ? pass [ ; will be "false" if this passenger is not part of the list pass
+        let has_plan_here (item bus_stop has_plan)
+        set has_plan_here lput ? has_plan_here
+        set has_plan replace-item bus_stop has_plan has_plan_here
+      ]
+    ]
+  ]
+
+end
+
+to communicate
+  ; send messages
+
+  ; TODO: condition for when to construct an outgoing message
+  if true [
+    let msg_str construct_outgoing_message
+    let n_bus count buses
+    let bus_ids n-values n_bus [ ? + 24 ]
+    foreach bus_ids [
+      if ? != bus_id [
+        send-message ? msg_str
+      ]
+    ]
+  ]
+
+  ; read
+  foreach inbox [
+    ; can we remove stuff from the inbox?
+    let t item 0 ?
+    if t = ticks - 1 [
+      let sender_id item 1 ?
+      let msg item 2 ?
+      digest_msg msg
+    ]
+  ]
+ end
