@@ -18,7 +18,7 @@ to-report passenger-count-at-bus-stop [ bus_stop ]
 end
 
 
-to-report bus-capacity
+to-report bus_capacity
   ; Return:
   ;   @capacity: the capacity of the bus based on its type
 
@@ -44,7 +44,7 @@ to-report free-spaces-on-bus
   ; Return:
   ;   @number: free spaces
 
-  let capacity bus-capacity
+  let capacity bus_capacity
 
   report capacity - length bus_passengers
 end
