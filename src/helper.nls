@@ -49,6 +49,14 @@ to-report free-spaces-on-bus
   report capacity - length bus_passengers
 end
 
+to-report slice [ i l ]
+  let s []
+  foreach l [
+    set s fput item i ? s
+  ]
+  report s
+end
+
 
 to-report member_nested_list [ i l ]
   let bool false
