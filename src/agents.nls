@@ -1,4 +1,4 @@
-__includes ["brams_recursion.nls" "bus_need.nls" "messaging.nls" "helper.nls" ]
+__includes ["determine_route.nls" "decide_add_bus.nls" "messaging.nls" "helper.nls" ]
 
 buses-own [
   ; Static, read-only variables. These values never change. You can read them, but you cannot change them.
@@ -20,6 +20,8 @@ buses-own [
   has_plan        ; ID's of passengers for which another bus already has a plan, passengers that don't need to be picked up by you. list of lists. list per bus stop
   dropped_off     ; ID's of the passengers that have been dropped of since the last sent message
   planless_hist   ; The history of how many passengers were planless up to some amount of ticks in the past
+  night_team      ; a list of buses to be added at 0:00
+  morning_team    ; a list of buses to be added at 6:00
 
   total_ticks_per_day
   planless_threshold
@@ -44,22 +46,21 @@ to init-buses
               [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]
   ]
   
-  ; for the test-case
-  set graph [ [] 
-              [2]
-              [1 3 4]
-              [2 5]
-              [2]
-              [3 6 7]
-              [5]
-              [5]
-              [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] ]             
+;  ; for the test-case
+;  set graph [ [] 
+;              [2]
+;              [1 3 4]
+;              [2 5]
+;              [2]
+;              [3 6 7]
+;              [5]
+;              [5]
+;              [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] ]             
 
-  set known_route []
-  set dropoff_intent [105]
+
 
   ; hyperparameters of the algorithm
-  set levels 2
+  set levels 3
   set total_ticks_per_day 1440
   set planless_threshold 100
   set need_thresh_1 0.0
@@ -69,6 +70,14 @@ to init-buses
   ; init of bus-own variables
   set dropped_off []
   set planless_hist n-values 10 [0]
+  set known_route []
+  set has_plan [ [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] ]
+  set dropoff_intent []
+  set dropped_off []
+  
+  ; init what teams of buses to add
+  set night_team [ 1 2 3 ] 
+  set morning_team [ 1 1 1 1 1 2 2 2 2 2 3 3 3 3 3 ] 
 
 end
 
@@ -77,34 +86,8 @@ to execute-actions
   ; Add decision making strategies for your agents here.
   ; You are allowed to use the global variable 'ticks'.
 
-  ; temporary code
-   set has_plan [[105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105] [105]]
-   set dropoff_intent [1 0]
-   
-   show get-passengers-at-stop 3
-
   ; decide whether to add a new bus this tick
-  if bus_id = 24 [ ; bus 24 is the 'president bus'
-    let var decide_add_bus planless_threshold
-    ; let decision item 0 var
-    let decision True
-    let planless item 1 var
-    set planless_hist lput planless but-first planless_hist
-    if (decision = True)  [
-      let need new_bus_need planless_hist
-      if need > need_thresh_1 [
-        ifelse need > need_thresh_2 [
-          ifelse need > need_thresh_3 [
-            add-bus 3
-          ][
-            add-bus 2
-          ]
-        ][
-          add-bus 1
-        ]
-      ]
-    ]
-  ]
+  decide_add_bus
 
   if current_stop > -1 [
 
@@ -122,198 +105,16 @@ to execute-actions
 
     ; if route has been completed, plan a new route
     if length known_route = 0 [
-      ; TODO
-      ; 1. read inbox
-      ; 2. calculate new route
-      ; 3. send message
-
-      ; set known_route reverse item 0 ( choose_next_station current_stop levels ) []) <-- call to akash' recursion
-      set known_route determine_route current_stop levels ; <-- call to bram's recursion
-      
-      communicate
+      read
+      set known_route determine_route current_stop levels 
+      send
     ]
 
     set next_stop item 0 known_route
     set known_route but-first known_route  ; remove the first element of the known_route
   ]
 
-  ; show (word "Next stop: " next_stop)
   travel-to next_stop
 
 end
 
-
-;to-report choose_next_station [ bus_stop level picked_up ]
-;  ; Utility recursion function
-;  ; Args:
-;  ;   @bus_stop
-;  ;   @level: level of recursion
-;  ;
-;  ; Return:
-;  ;   @max of utility
-;
-;;  show " " 
-;;  show "enter choose_next_station"
-;;  show "level"
-;;  show level
-;
-;  ; recursion base step
-;  if level <= 0 [
-;    let report_value []
-;    set report_value lput [] report_value
-;    set report_value lput 0 report_value
-;
-;    report report_value
-;  ]
-;
-;  ; get connecting nodes
-;  let connecting_nodes item bus_stop graph
-;
-;  let utilities []
-;  let routes_1 []
-;  let max_utility -1000
-;
-;  foreach connecting_nodes [
-;
-;    let bram actual_utility ? picked_up
-;
-;    ; Get the utility for each of the connecting nodes, with level = level - 1
-;    let return_list choose_next_station ? (level - 1) (item 1 bram)  ; (recursion step)
-;
-;    let u item 1 return_list    
-;    set u u + item 0 bram
-;
-;    if u > max_utility [
-;      set max_utility u
-;    ]
-;
-;    set utilities lput u utilities
-;    set routes_1 lput item 0 return_list routes_1
-;  ]
-;
-;  ; Get list of max_utilities. If there are multiple stations with the same
-;  ; utility, then randomly choose one of those stations
-;  let max_utility_indices []
-;  let index 0
-;
-;  foreach utilities [
-;    if ? = max_utility [
-;      set max_utility_indices lput index max_utility_indices
-;    ]
-;    set index index + 1
-;  ]
-;  
-;  show "route modelled so far"
-;  show routes_1
-;  show "we are considering bus stop"
-;  show bus_stop
-;  show "stations we can get to from here"
-;  show connecting_nodes
-;  show "utilities"
-;  show utilities  
-;
-;  let select_node item random length max_utility_indices max_utility_indices  ; random bus_stop with the max utility
-;  let chosen_route item select_node routes_1
-;  set chosen_route lput item select_node connecting_nodes chosen_route
-;  
-;;  show "chosen_route (read backwards)"
-;;  show item select_node routes_1
-;;  show chosen_route
-;
-;  let report_list []
-;  set report_list lput chosen_route report_list
-;  set report_list lput max_utility report_list
-;
-;  report report_list
-;end
-;
-;
-;to-report actual_utility [ bus_stop picked_up ]
-;  ; Compute the utility on traveling to 'bus stop'
-;  ; Args:
-;  ;   @bus_stop
-;  ;   @picked_up: potential passenger pickups in parent bus stop. list of passenger ids
-;  ; Return:
-;  ;   [ @utility @potential_pickups ]
-;
-;  ; 'Droppable' passengers in the potential next bus stop (dropoffs)
-;  let dropoffs 0
-;  foreach bus_passengers [
-;
-;    ; FIXME: multiple dropoffs - minor (e.g. route: 2 3 2 3 2 3)
-;     if item 1 ? = bus_stop [
-;       set dropoffs dropoffs + 1
-;     ]
-;  ]
-;  ; "potential" dropoffs
-;  foreach picked_up [
-;     if item 1 ? = bus_stop [
-;       set dropoffs dropoffs + 1
-;     ]
-;  ]
-;
-;  ; Free spaces in the bus
-;  let free_spaces free-spaces-on-bus
-;  set free_spaces free_spaces - length picked_up
-;  set free_spaces free_spaces + dropoffs
-;
-;  ; set number of passengers at stop to number of passengers without a plan
-;  let number_have_plan length item bus_stop has_plan
-;  let number_at_stop passenger-count-at-bus-stop bus_stop - number_have_plan
-;
-;  ; destination list
-;  let destinations n-values 24 [0]
-;
-;  foreach bus_passengers [
-;    set destinations replace-item item 1 ? destinations 1
-;  ]
-;  foreach picked_up [
-;    set destinations replace-item item 1 ? destinations 1
-;  ]
-;
-;  let remaining_spaces free_spaces
-;  ; Potential pickups
-;  let potential_pickups []
-;
-;  let overlapp 0
-;  foreach get-passengers-at-stop bus_stop [
-;    if remaining_spaces > 0 [
-;      if not (member? (item 0 ?) item bus_stop has_plan) [
-;        ; overlapping destinations
-;        let temp_destination item 1 ?
-;        if item temp_destination destinations = 1 [
-;          set overlapp overlapp + 1
-;          set potential_pickups lput ? potential_pickups
-;          set remaining_spaces remaining_spaces - 1
-;        ]
-;      ]
-;    ]
-;  ]
-;
-;  foreach get-passengers-at-stop bus_stop [
-;    if remaining_spaces > 0 [
-;      if not (member? (item 0 ?) item bus_stop has_plan) [
-;        ; non overlapping destinations
-;        let temp_destination item 1 ?
-;        if item temp_destination destinations = 0 [
-;          set potential_pickups lput ? potential_pickups
-;          set remaining_spaces remaining_spaces - 1
-;        ]
-;      ]
-;    ]
-;  ]
-;
-;  ; alpha
-;  let alpha free_spaces / bus_capacity
-;  ; set pickups to mean of possible pickups and number of passengers with same destination as the ones onboard
-;  ; only do this if the bus is not empty?
-;  let pickups mean list length potential_pickups overlapp
-;  let utility_value (1 - alpha) * dropoffs + alpha * pickups
-;
-;  let val []
-;  set val lput utility_value val
-;  set val lput potential_pickups val
-;
-;  report val
-;
-;end

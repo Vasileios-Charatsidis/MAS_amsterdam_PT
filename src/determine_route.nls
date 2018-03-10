@@ -1,0 +1,216 @@
+to-report determine_route [ bus_stop level ]
+  ; get all possible routes for the amount of levels you have
+  ; determine utility per route
+     ; utility per station
+         ; util a-->b, would-have at B = actual utility(a-->b, would-have at A)
+         ; util b-->c, would-have at C = actual utility(b-->, would-have at B)
+  ; get maximum utility route
+  ; determine dropoff intent based on would-have of max route maybe?
+
+  ; would_have like  [ [ pass_id destination "b" (on board)]
+  ;                    [ pass_id destination "d" (already dropped off)]
+  ;                     ... ]
+
+  ; utils_routes like [ [ util [ station_id station_id ... ] wouldhave at last station ]
+  ;                     [ util [ station_id station_id ... ] wouldhave at last station ]
+  ;                     ... ]
+
+  ; initialse some variables
+
+;  show ( word "current bus passengers: " bus_passengers )
+
+  let has [] ; the people the bus HAS on board is the starting point for keeping track of which passengers the bus WOULD HAVE on board at various points in the route
+  foreach bus_passengers [
+    let passenger ?
+    set passenger lput "b" passenger ; b stands for 'actually on board' as opposed to d; 'already dropped off'
+    set has lput passenger has
+  ]
+
+  ; get all routes for the amount of levels you have
+  let possible_routes []
+  set possible_routes get_potential_routes bus_stop level
+
+;  show "all possible routes"
+;  show possible_routes
+
+  ; determine utility per route
+  let utils_routes []
+  foreach possible_routes [
+;    show " "
+    let u 0
+    let would_have has
+    let this_route []
+    foreach ? [ ; for each station on the route
+      let return_list actual_utility ? would_have
+      set u u + item 0 return_list
+      set would_have item 1 return_list
+    ]
+    set this_route lput u this_route
+    set this_route lput ? this_route
+    set this_route lput would_have this_route
+    set utils_routes lput this_route utils_routes
+  ]
+
+;  show "all possible routes and their utilities"
+;  foreach utils_routes [
+;    show item 1 ?
+;    show item 0 ?
+;  ]
+
+  ; get the route with max utility
+  let max_util -100
+  let route []
+  let dropoff_intent_dirty []
+  foreach utils_routes [
+    let u item 0 ?
+    if u > max_util [
+      set max_util u
+      set route item 1 ?
+      set dropoff_intent_dirty item 2 ?
+    ]
+  ]
+
+  ; clean dropoff_intent_dirty
+  let dropoff_intent_clean []
+  foreach dropoff_intent_dirty [
+    set dropoff_intent_clean lput item 0 ? dropoff_intent_clean
+  ]
+  set dropoff_intent dropoff_intent_clean
+
+  report route
+end
+
+to-report actual_utility [ bus_stop would_have ]
+;  show ( word "departing for bus stop " bus_stop " the bus would have these on board: " would_have )
+
+  let n_on_board 0 ; we need to find out how many seats we have left in order to determine how many we can pick up
+  foreach would_have [
+    if item 2 ? = "b" [
+      set n_on_board n_on_board + 1
+    ]
+  ]
+  let n_free_spaces bus_capacity - n_on_board
+  let alpha n_free_spaces / bus_capacity ; the parameter that weighs desire to pick-up versus desire to drop-off
+
+  ; model potential dropoffs
+  let n_dropoff 0
+  let iter n-values length would_have [ ? ]
+  foreach iter [
+    let would_passenger item ? would_have ; check if we can drop off hypothetical passengers that we'd potentially be carrying if we arrived here
+    if ( item 1 would_passenger = bus_stop ) and ( item 2 would_passenger = "b" ) [
+      set would_passenger replace-item 2 would_passenger "d"
+      set would_have replace-item ? would_have would_passenger
+      set n_dropoff n_dropoff + 1
+    ]
+  ]
+  set n_free_spaces n_free_spaces + n_dropoff
+
+  ; prepare variables
+  let destinations n-values 24 [0] ; we need to know which destinations the passengers on-board want so that we can check for overlap
+  foreach would_have [
+    set destinations replace-item item 1 ? destinations 1
+  ]
+
+  ; model potential pickups
+  let n_overlap 0
+  let n_potential_pickup 0
+
+  ; passengers with overlapping destinations get priority in picking up
+  foreach get-passengers-at-stop bus_stop [
+    if n_free_spaces > 0 [
+      ; only consider those passengers that other busses do not already have a plan for
+      ; or passengers that we have already modelled to pick up ( in route 2-3-2-3 we pick up passengers at station 2 only once)
+      if (not (member? (item 0 ?) item bus_stop has_plan)) and (not ( member? (item 0 ?) slice 0 would_have )) [
+        let temp_destination item 1 ?
+        if item temp_destination destinations = 1 [
+          let would_passenger ?
+          set would_passenger lput "b" would_passenger
+          set would_have lput would_passenger would_have
+          set n_overlap n_overlap + 1
+          set n_potential_pickup n_potential_pickup + 1
+          set n_free_spaces n_free_spaces - 1
+        ]
+      ]
+    ]
+  ]
+
+  ; passengers with non overlapping destinations may enter if there is still room
+  foreach get-passengers-at-stop bus_stop [
+    if n_free_spaces > 0 [
+      if (not (member? (item 0 ?) item bus_stop has_plan)) and (not ( member? (item 0 ?) slice 0 would_have )) [
+        let temp_destination item 1 ?
+        if item temp_destination destinations = 0 [
+          let would_passenger ?
+          set would_passenger lput "b" would_passenger
+          set would_have lput would_passenger would_have
+          set n_potential_pickup n_potential_pickup + 1
+          set n_free_spaces n_free_spaces - 1
+        ]
+      ]
+    ]
+  ]
+
+  ; determine utility
+  let n_pickup mean list n_potential_pickup n_overlap  ;set pickups to mean of possible pickups and number of passengers with same destination as the ones onboard
+  let utility (1 - alpha) * n_dropoff + alpha * n_pickup
+
+  ; prepare return variables
+  let return_list []
+  set return_list lput utility return_list
+  set return_list lput would_have return_list
+
+;  show ( word "when we get there, utility would be " item 0 return_list " and these would be on board: " item 1 return_list)
+
+  report return_list
+end
+
+
+to-report get_potential_routes [ bus_stop level ]
+  let potential_routes []
+  let l []
+  set l lput bus_stop l
+  set potential_routes lput l potential_routes
+
+  ; get what routes we can make if we take one step further than we already have
+  ; add them to the list
+  foreach n-values level [ ? ] [
+    let potential_routes_temp []
+    foreach potential_routes [
+        let potential_routes_from_here link_route ?
+        foreach potential_routes_from_here [
+          set potential_routes_temp lput ? potential_routes_temp
+        ]
+    ]
+    set potential_routes potential_routes_temp
+  ]
+  
+  ; remove routes that are not of the right length [[ A ] [ A B C ] ... ] --> [[ A B C ] ... ]
+  foreach potential_routes [
+    if length ? < level [
+     set potential_routes remove ? potential_routes
+    ]
+  ]
+
+  ; return the routes without the current station attached [ A B C ] --> [ B C ]
+  let iter n-values length potential_routes [ ? ]
+  foreach iter [
+    set potential_routes replace-item ? potential_routes but-first item ? potential_routes
+  ]
+
+  report potential_routes
+end
+
+to-report link_route [ route_so_far ]
+  ; extend the route we have so far with the stations that we can get to from the last station
+  ; [A] --> [[A B] [A C] ... ]
+  ; [A B ] --> [[A B D ] [ A B E ] ... ]
+
+  let potential_routes []
+
+  let connecting_nodes item (last route_so_far) graph
+  foreach connecting_nodes [
+    let potential_route lput ? route_so_far
+    set potential_routes lput potential_route potential_routes
+  ]
+  report potential_routes
+end

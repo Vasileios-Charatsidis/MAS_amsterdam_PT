@@ -283,8 +283,9 @@ to set-time
 end
 
 to get-daily-ridership-schedule
-;  let file_name (word "passengers-location_day" days ".csv")
-  let file_name "test_case.csv"
+  let file_name (word "passengers-location_day" days ".csv")
+;  let file_name "test_case1.csv"
+;  let file_name "test_case2.csv"
   let daily_ridership_schedule parse-file-information file_name
   foreach daily_ridership_schedule [
     let from_bus_stop item 0 ?

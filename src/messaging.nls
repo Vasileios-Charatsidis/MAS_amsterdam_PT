@@ -1,20 +1,24 @@
-to-report construct_outgoing_message
-  ; after the flag "p" come the passengers for which this bus has plans. Other buses don't need to consider helping them
-  ; after the flag "d" come the passengers that have been dropped of since the last message
-  ; [ "p 105 106 110 d 98 100 " ]
-
-  let msg ["p"]
-  foreach dropoff_intent [
-    set msg lput ? msg
+to read
+  foreach inbox [
+    ; can we remove stuff from the inbox?
+    let t item 0 ?
+    if t = ticks - 1 [
+      let sender_id item 1 ?
+      let msg item 2 ?
+      digest_msg msg
+    ]
   ]
-  set msg lput "d" msg
-  foreach dropped_off [
-    set msg lput ? msg
-  ]
-  set dropped_off [] ; forget from memory to prevent blowing up the size of this variable
+end
 
-  set msg lput " " msg
-  report (word msg)
+to send
+  let msg_str construct_outgoing_message
+  let n_bus count buses
+  let bus_ids n-values n_bus [ ? + 24 ]
+  foreach bus_ids [
+    if ? != bus_id [
+      send-message ? msg_str
+    ]
+  ]
 end
 
 to digest_msg [ msg ]
@@ -91,32 +95,23 @@ to digest_msg [ msg ]
       ]
     ]
   ]
-
 end
 
-to communicate
-  ; send messages
+to-report construct_outgoing_message
+  ; after the flag "p" come the passengers for which this bus has plans. Other buses don't need to consider helping them
+  ; after the flag "d" come the passengers that have been dropped of since the last message
+  ; [ "p 105 106 110 d 98 100 " ]
 
-  ; TODO: condition for when to construct an outgoing message
-  if true [
-    let msg_str construct_outgoing_message
-    let n_bus count buses
-    let bus_ids n-values n_bus [ ? + 24 ]
-    foreach bus_ids [
-      if ? != bus_id [
-        send-message ? msg_str
-      ]
-    ]
+  let msg ["p"]
+  foreach dropoff_intent [
+    set msg lput ? msg
   ]
+  set msg lput "d" msg
+  foreach dropped_off [
+    set msg lput ? msg
+  ]
+  set dropped_off [] ; forget from memory to prevent blowing up the size of this variable
 
-  ; read
-  foreach inbox [
-    ; can we remove stuff from the inbox?
-    let t item 0 ?
-    if t = ticks - 1 [
-      let sender_id item 1 ?
-      let msg item 2 ?
-      digest_msg msg
-    ]
-  ]
- end
+  set msg lput " " msg
+  report (word msg)
+end
