@@ -23,11 +23,11 @@ buses-own [
   night_team      ; a list of buses to be added at 0:00
   morning_team    ; a list of buses to be added at 6:00
 
-  total_ticks_per_day
-  planless_threshold
-  need_thresh_1
-  need_thresh_2
-  need_thresh_3
+  total_ticks_per_day 
+  planless_threshold ; The amount of unaccounted-for passengers above which we decide to add a new bus
+  need_thresh_1      ; The angle of growth of unaccounted-for passengers above which we decide to add a bus of type 1
+  need_thresh_2      ; The angle of growth of unaccounted-for passengers above which we decide to add a bus of type 2
+  need_thresh_3      ; The angle of growth of unaccounted-for passengers above which we decide to add a bus of type 3
 ]
 
 
@@ -46,7 +46,7 @@ to init-buses
               [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]
   ]
   
-;  ; for the test-case
+;  ; graph for the test-case
 ;  set graph [ [] 
 ;              [2]
 ;              [1 3 4]
@@ -57,8 +57,6 @@ to init-buses
 ;              [5]
 ;              [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] ]             
 
-
-
   ; hyperparameters of the algorithm
   set levels 3
   set total_ticks_per_day 1440
@@ -67,7 +65,7 @@ to init-buses
   set need_thresh_2 2.0
   set need_thresh_3 5.0
 
-  ; init of bus-own variables
+  ; initialisation of bus-own variables
   set dropped_off []
   set planless_hist n-values 10 [0]
   set known_route []
@@ -75,28 +73,25 @@ to init-buses
   set dropoff_intent []
   set dropped_off []
   
-  ; init what teams of buses to add
+  ; init bus-teams
   set night_team [ 1 2 3 ] 
   set morning_team [ 1 1 1 1 1 2 2 2 2 2 3 3 3 3 3 ] 
 
 end
 
-
 to execute-actions
-  ; Add decision making strategies for your agents here.
-  ; You are allowed to use the global variable 'ticks'.
-
+  
   ; decide whether to add a new bus this tick
   decide_add_bus
 
-  if current_stop > -1 [
-
-    ; drop-off if possible
+  if current_stop > -1 [ ; if the bus is at a stop
+    
+    ; drop off 
     foreach bus_passengers [
       if item 1 ? = current_stop [ drop-off-passenger item 0 ? ]
     ]
     
-    ; pick-up if that was the plan
+    ; pick up passengers
     foreach get-passengers-at-stop current_stop [
       if member? item 0 ? dropoff_intent [
         pick-up-passenger item 0 ?
@@ -110,6 +105,7 @@ to execute-actions
       send
     ]
 
+    ; follow route
     set next_stop item 0 known_route
     set known_route but-first known_route  ; remove the first element of the known_route
   ]

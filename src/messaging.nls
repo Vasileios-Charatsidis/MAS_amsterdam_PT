@@ -1,16 +1,28 @@
+; This file contains all functions regarding communication between buses
+; This is an include-file to agents.nls.
+;
+; All the variables in buses-own and globals can be accessed here
+
+; A bus read its messages before inferring what route it should take
+; The variable has_plan is updated, it will help the bus focus on helping the correct passengers
+; passengers that have been dropped off since the last message can be forgotten, lest the variable has_plan doesn't grow too large
+; once the route has been inferred, a bus sends a message to all other buses letting them know what passengers it will help on its route
+
 to read
+  ; digest all the messages in this bus' inbox
   foreach inbox [
-    ; can we remove stuff from the inbox?
     let t item 0 ?
     if t = ticks - 1 [
       let sender_id item 1 ?
       let msg item 2 ?
       digest_msg msg
+      ; can we remove messages from the inbox?
     ]
   ]
 end
 
 to send
+  ; send messages to all other buses
   let msg_str construct_outgoing_message
   let n_bus count buses
   let bus_ids n-values n_bus [ ? + 24 ]

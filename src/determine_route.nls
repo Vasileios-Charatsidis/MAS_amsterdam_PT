@@ -1,3 +1,16 @@
+; This file contains all functions regarding inferring routes
+; This is an include-file to agents.nls.
+;
+; All the variables in buses-own and globals can be accessed here
+
+; Upon inferring a route, a bus only considers those passengers that other buses are not already planning to pick up
+; The route to take is the route with the maximum expected utility
+; Utility is based on 
+; 1) The fullness of the bus (the fuller the bus, the more weight is given to dropoff as opposed to pickup)
+; 2) Whether the passengers that it could pick up have the same destination as passengers already on board
+; In order to determine utility for a route that is multiple steps ahead all routes are modelled and utility is determined for each of them
+; It must be taken into account that a passenger can only be picked up and dropped off once
+
 to-report determine_route [ bus_stop level ]
   ; get all possible routes for the amount of levels you have
   ; determine utility per route

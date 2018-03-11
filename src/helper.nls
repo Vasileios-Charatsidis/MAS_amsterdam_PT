@@ -1,5 +1,6 @@
-; File contains all the helper functions used.
-; This is included in the agents.nls file.
+; This file contains all the helper functions used.
+; it is an include-file to agents.nls.
+; Helper functions are general low-level functions
 ;
 ; All the variables in buses-own and globals can be accessed here
 
@@ -42,11 +43,8 @@ to-report bus_capacity
       set capacity 150
     ]
   ]
-
   report capacity
-
 end
-
 
 to-report free-spaces-on-bus
   ; Compute the number of free spaces on the bus
@@ -65,7 +63,6 @@ to-report slice [ i l ]
   ]
   report s
 end
-
 
 to-report member_nested_list [ i l ]
   let bool false

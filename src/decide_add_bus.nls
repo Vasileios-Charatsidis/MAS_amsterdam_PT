@@ -1,3 +1,16 @@
+; This file contains all functions on adding new buses
+; This is an include-file to agents.nls.
+;
+; All the variables in buses-own and globals can be accessed here
+;
+; Buses are added when the amount of unaccounted-for people on the map grows too large
+; The available information and the heuristic for decision are the same for all buses
+; Therefore only one bus, bus 24, can make all the decisions to ensure the global goal
+;
+; at 0:00, a 'night-team' of buses is added
+; at 6:00, a 'morning-team' of buses is added
+
+
 to decide_add_bus
   if bus_id = 24 [ ; bus 24 is the 'president bus'
     
