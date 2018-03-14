@@ -8,122 +8,91 @@
 ; passengers that have been dropped off since the last message can be forgotten, lest the variable has_plan doesn't grow too large
 ; once the route has been inferred, a bus sends a message to all other buses letting them know what passengers it will help on its route
 
-to read
-  ; digest all the messages in this bus' inbox
-  foreach inbox [
-    let t item 0 ?
-    if t = ticks - 1 [
-      let sender_id item 1 ?
-      let msg item 2 ?
-      digest_msg msg
-      ; can we remove messages from the inbox?
-    ]
-  ]
-end
-
-to send
-  ; send messages to all other buses
-  let msg_str construct_outgoing_message
-  let n_bus count buses
-  let bus_ids n-values n_bus [ ? + 24 ]
-  foreach bus_ids [
-    if ? != bus_id [
-      send-message ? msg_str
-    ]
-  ]
-end
-
-to digest_msg [ msg ]
-  ; get which passengers are to be added to has_plan and which can be forgotten
+to digest_type_1 [ msg ]
+  ; Parse type 1 message
   ; Args
   ;   @msg
+  ; Message format: [ 1 route dropoff_intent pickup_intent ]
+  ;                     route: [station_1 station_2 ...]
+  ;                     dropoff_intent: [ [pass_id1 pass_id2 ] [pass_id3] [pass_id4] ... ]
+  ;                     pickup_intent:  [ [pass_id1 destid] [pass_id2 destid] ...]
 
-  ; initialise variables
-  let l []
-  let start_id 0
-  let cur_id 0
+  set known_route item 1 msg
+  set dropoff_intent item 2 msg
+  set pickup_intent item 3 msg
 
-  let split_idx position "d" msg
-  let msg_p substring msg 0  split_idx ; message on passengers for which there is a plan
-  let msg_d substring msg split_idx length msg ; message on passengers that have been dropped off by other buses
+end
 
-;  show "variable has_plan before digesting the message"
-;  show has_plan
 
-  ; read the part of the message about passengers that have been dropped of
-  let iter n-values length msg_d [ ? ]
-  foreach iter [
-    if item ? msg_d = "d" or item ? msg_d = " " [
-      let var substring msg_d (start_id + 1) (cur_id + 1)
-      if length var > 0 [
-        set l lput var l
-      ]
-      set start_id ?
-    ]
-    set cur_id ?
-  ]
-  set l map [ read-from-string ? ] l
-
-  ; remove passengers that have been dropped off from the variable has_plan
-  let i 0
-  foreach has_plan [
-    let has_plan_here ?
-    foreach l [
-      if member? ? has_plan_here [
-        let idx position ? has_plan_here
-        set has_plan_here remove-item idx has_plan_here
-      ]
-      set has_plan replace-item i has_plan has_plan_here
-      set i ( i + 1 )
-    ]
-  ]
-  ; read the part of the message about passengers for which there is a plan
-  set l []
-  set start_id 0
-  set cur_id 0
-  set iter n-values length msg_p [ ? ]
-  foreach iter [
-    if item ? msg_p = "p" or item ? msg_p = " " [
-      let var substring msg (start_id + 1) (cur_id + 1)
-      if length var > 0 [
-        set l lput var l
-      ]
-      set start_id ?
-    ]
-    set cur_id ?
-  ]
-  set l map [ read-from-string ? ] l
-
-  ; add passengers for which there is a plan to the variable has_plan
-  set iter n-values 24 [ ? ]
-  foreach iter [
-    let bus_stop ?
-    let pass get-passengers-at-stop bus_stop
-    foreach l [
-      if member_nested_list ? pass [ ; will be "false" if this passenger is not part of the list pass
-        let has_plan_here (item bus_stop has_plan)
-        set has_plan_here lput ? has_plan_here
-        set has_plan replace-item bus_stop has_plan has_plan_here
-      ]
+to digest_type_2 [ msg ]
+  ; remove this passenger from pickup intent and dropoff intent, because another bus has a better plan for him/her
+  let pass_id last msg
+  set pickup_intent remove pass_id pickup_intent
+  foreach dropoff_intent [
+    if member? pass_id ? [
+      let dropoff_intent_here remove pass_id ?
+      set dropoff_intent replace-item ( position ? dropoff_intent ) dropoff_intent dropoff_intent_here
     ]
   ]
 end
 
-to-report construct_outgoing_message
-  ; after the flag "p" come the passengers for which this bus has plans. Other buses don't need to consider helping them
-  ; after the flag "d" come the passengers that have been dropped of since the last message
-  ; [ "p 105 106 110 d 98 100 " ]
 
-  let msg ["p"]
-  foreach dropoff_intent [
-    set msg lput ? msg
-  ]
-  set msg lput "d" msg
-  foreach dropped_off [
-    set msg lput ? msg
-  ]
-  set dropped_off [] ; forget from memory to prevent blowing up the size of this variable
+to communication
+  ifelse bus_id = 24 [ ; if this bus is the oracle
+    foreach inbox [
+       ; unpack message
+       let requester_bus_id item 1 ?
+       let msg item 2 ?
+       let bus_stop item 0 msg
+       let has item 1 msg
 
-  set msg lput " " msg
-  report (word msg)
+       ; determine route for the requester
+       let return_list determine_route bus_stop requester_bus_id has ; ( messages regarding bidding are included in the determine_route function )
+
+       ; send message to the requester
+       let route item 0 return_list
+       let dropoff_intent_requester item 1 return_list
+       let pickup_intent_requester item 2 return_list
+       send-message requester_bus_id ( list 1 route dropoff_intent_requester pickup_intent_requester )
+    ]
+
+   let has []
+   foreach bus_passengers [
+     let passenger ?
+     set passenger lput "b" passenger ; b stands for 'actually on board' as opposed to d; 'already dropped off'
+     set has lput passenger has
+   ]
+   ; determine route for oracle
+   let return_list determine_route current_stop 24 has; ( messages regarding bidding are included in the determine_route function )
+
+   set known_route item 0 return_list
+   set dropoff_intent item 1 return_list
+   set pickup_intent item 2 return_list
+
+  ][ ; if this bus is not the oracle
+
+    ; if route has (almost) been completed, ask oracle for a new route
+    if length known_route = 0 [
+      ; ask oracle for route
+
+       let has [] ; the people the bus HAS on board is the starting point for keeping track of which passengers the bus WOULD HAVE on board at various points in the route
+       foreach bus_passengers [
+         let passenger ?
+         set passenger lput "b" passenger ; b stands for 'actually on board' as opposed to d; 'already dropped off'
+         set has lput passenger has
+       ]
+
+       send-message 24 ( list current_stop has )
+    ]
+
+    foreach inbox [
+      let msg item 2 ?
+
+      ifelse item 0 msg = 1 [
+        digest_type_1 msg
+      ] [
+        digest_type_2 msg
+      ]
+    ]
+  ]
 end

@@ -17,6 +17,7 @@ buses-own [
   levels          ; hyperparameter for the depth of the graph
   known_route     ; Assessed route for this bus (with respect to levels hyperparam)
   dropoff_intent  ; ID's of the passengers for which this bus has plans
+  pickup_intent   ; ID's of the passengers to pick up
   has_plan        ; ID's of passengers for which another bus already has a plan, passengers that don't need to be picked up by you. list of lists. list per bus stop
   dropped_off     ; ID's of the passengers that have been dropped of since the last sent message
   planless_hist   ; The history of how many passengers were planless up to some amount of ticks in the past
@@ -25,7 +26,7 @@ buses-own [
   morning_team    ; a list of buses to be added at 6:00
   bid             ; a boolean signifying whether we are working with bids or not
 
-  total_ticks_per_day 
+  total_ticks_per_day
   planless_threshold ; The amount of unaccounted-for passengers above which we decide to add a new bus
   need_thresh_1      ; The angle of growth of unaccounted-for passengers above which we decide to add a bus of type 1
   need_thresh_2      ; The angle of growth of unaccounted-for passengers above which we decide to add a bus of type 2
@@ -47,9 +48,9 @@ to init-buses
               [2 6 9] [3 8 20] [4 5 17 13 21] [1 16 17] [20 15 22] [7 10 22 23] [0 23] [0 12 18]
               [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]
   ]
-  
+
   ; graph for the test-case
-  set graph [ [] 
+  set graph [ []
               [2]
               [1 3 4]
               [2 5]
@@ -57,7 +58,7 @@ to init-buses
               [3 6 7]
               [5]
               [5]
-              [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] ]             
+              [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] ]
 
   ; hyperparameters of the algorithm
   set levels 3
@@ -66,21 +67,23 @@ to init-buses
   set need_thresh_1 0.0
   set need_thresh_2 2.0
   set need_thresh_3 5.0
+  set bid false
 
   ; initialisation of bus-own variables
   set dropped_off []
+  set pickup_intent []
   set planless_hist n-values 10 [0]
   set known_route []
   set has_plan n-values 24 [ ["empty" ] ]
   set has_plan [ ["empty"] ["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"] ]
   set dropoff_intent [[]]
   set dropped_off []
-  
+
   ; distance mat for test-case
   let row n-values 24 [ random 3 ]
-  set distance_mat n-values 24 [ row ] 
-  
-  show "distance_mat is set to test_case"
+  set distance_mat n-values 24 [ row ]
+
+  ; show "distance_mat is set to test_case"
   set distance_mat replace-item 1 distance_mat [1 0 2 4 4 6 8 8 ]
   set distance_mat replace-item 2 distance_mat [1 2 0 2 2 4 6 6 ]
   set distance_mat replace-item 3 distance_mat [1 4 2 0 4 2 4 4 ]
@@ -88,41 +91,45 @@ to init-buses
   set distance_mat replace-item 5 distance_mat [1 6 4 2 6 0 2 2 ]
   set distance_mat replace-item 6 distance_mat [1 8 6 4 8 2 0 4 ]
   set distance_mat replace-item 7 distance_mat [1 8 6 4 8 2 4 0 ]
-  
+
   ; init bus-teams
-  set night_team [ 1 2 3 ] 
-  set morning_team [ 1 1 1 1 1 2 2 2 2 2 3 3 3 3 3 ] 
+  set night_team [ 1 2 3 ]
+  set morning_team [ 1 1 1 1 1 2 2 2 2 2 3 3 3 3 3 ]
 
 end
 
 to execute-actions
-  
+
+  show get-passengers-at-stop 3
+
   ; decide whether to add a new bus this tick
   decide_add_bus
-  
+
   ; handle whether this bus wants a route or is the oracle and must give a route
-  plan_routes
+  communication
 
   if current_stop > -1 [ ; if the bus is at a stop
-    
-    ; drop off 
-    foreach bus_passengers [
-      if item 1 ? = current_stop [ drop-off-passenger item 0 ? ]
+
+    ; drop off
+    foreach item 0 dropoff_intent [
+      drop-off-passenger ?
     ]
-    
+    set dropoff_intent but-first dropoff_intent
+
+    let picked_up []
+    let passengers_at_stop get-passengers-at-stop current_stop
+
     ; pick up passengers
-    foreach get-passengers-at-stop current_stop [
-      if member? item 0 ? dropoff_intent [
-        pick-up-passenger item 0 ?
-      ] 
+    foreach pickup_intent [
+      if member? ? slice 0 passengers_at_stop [
+        pick-up-passenger ?
+        set picked_up lput ? picked_up
+      ]
     ]
-    
-;    ; if route has been completed, plan a new route
-;    if length known_route = 0 [
-;      read
-;      set known_route determine_route current_stop levels 
-;      send
-;    ]
+    ; remove picked up passengers
+    foreach picked_up [
+      set pickup_intent remove ? pickup_intent
+    ]
 
     ; follow route
     set next_stop item 0 known_route
@@ -132,4 +139,3 @@ to execute-actions
   travel-to next_stop
 
 end
-

@@ -5,55 +5,10 @@
 
 ; Upon inferring a route, a bus only considers those passengers that other buses are not already planning to pick up
 ; The route to take is the route with the maximum expected utility
-; Utility is based on 
+; Utility is based on
 
 ; In order to determine utility for a route that is multiple steps ahead all routes are modelled and utility is determined for each of them
 ; It must be taken into account that a passenger can only be picked up and dropped off once
-
-to plan_routes
-  ifelse bus_id = 24 [ ; if this bus is the oracle
-    ; digest messages to the oracle
-    let return_list digest_msg_from_bus_to_oracle ; TO DO <-- Akash' code here
-    let bus_stop item 0 return_list 
-    let requester_bus_id item 1 return_list 
-    let has item 2 return_list
-    
-    set return_list determine_route [ bus_stop requester_bus_id has ]
-    
-    ; send message back to bus to bus
-    let route item 0 return_list
-    let dropoff_intent_requester item 1 return_list
-    let pickup_intent_requester item 2 return_list
-    
-    ; let msg construct_msg_to_bus route dropoff_intent_requester pickup_intent_requester    ; TO DO <-- Akash' code here
-    ; send msg back to bus
-  ][ ; if this bus is not the oracle
-  
-    ; if route has (almost) been completed, ask oracle for a new route
-    if length known_route = 0 [
-      ; ask oracle for route
-      
-      ;  let has [] ; the people the bus HAS on board is the starting point for keeping track of which passengers the bus WOULD HAVE on board at various points in the route
-      ;  foreach bus_passengers [
-      ;    let passenger ?
-      ;    set passenger lput "b" passenger ; b stands for 'actually on board' as opposed to d; 'already dropped off'
-      ;    set has lput passenger has
-      ;  ]
-      
-      ; let msg construct_msg_to_oracle current_stop has ; TO DO <-- Akash' code here
-      
-      ; send to oracle     
-      ; TO DO Akash' code here
-      
-    ]
-    
-    ; if there's something in the inbox, read the message from the oracle and digest it
-    ; TO DO Akash' code here
-  
-  ]
-  
-  
-end
 
 to-report determine_route [ bus_stop requester_bus_id has ]
   ; get all possible routes for the amount of levels you have
@@ -71,14 +26,14 @@ to-report determine_route [ bus_stop requester_bus_id has ]
   ; utils_routes like [ [ util [ station_id station_id ... ] wouldhave at last station ]
   ;                     [ util [ station_id station_id ... ] wouldhave at last station ]
   ;                     ... ]
-  
+
   ; dropoff_intent_requester like [ [ pass_id ... ]
-  ;                       [ pass_id ... ] 
+  ;                       [ pass_id ... ]
   ;                       ... ] where the entries coincide with the bus stops in the variable route. There is no dropoff_intent for the last stop on the route
 
   ; initialse some variables
 
-  show ( word "current bus passengers: " bus_passengers )
+  ; show ( word "current bus passengers: " bus_passengers )
 
 ;  let has [] ; the people the bus HAS on board is the starting point for keeping track of which passengers the bus WOULD HAVE on board at various points in the route
 ;  foreach bus_passengers [
@@ -86,11 +41,11 @@ to-report determine_route [ bus_stop requester_bus_id has ]
 ;    set passenger lput "b" passenger ; b stands for 'actually on board' as opposed to d; 'already dropped off'
 ;    set has lput passenger has
 ;  ]
-  
+
   ; initialise utils_routes
   ; [ [ util [ station_id station_id ... ] wouldhave at last station ] ]
-  let utils_routes ( list ( list 0 ( list bus_stop ) has ) ) 
-  
+  let utils_routes ( list ( list 0 ( list bus_stop ) has ) )
+
   ; determine all possible routes and their utility using dynamic programming
   ; for determining utility of [ A B C D ] and [ A B C E ], the utility of subroute [ A B C ] needs to be calculated only once
   let iter n-values levels [ ? ]
@@ -98,11 +53,11 @@ to-report determine_route [ bus_stop requester_bus_id has ]
     let lvl ?
     foreach utils_routes [
       let route_so_far item 1 ?
-      show route_so_far
+      ; show route_so_far
       if length route_so_far = 1 + lvl [
         let u item 0 ?
         let would_have item 2 ?
-        let from last route_so_far 
+        let from last route_so_far
         foreach item from graph [ ; to all connecting nodes
           let return_list utility from ? would_have
           let this_route []
@@ -115,92 +70,93 @@ to-report determine_route [ bus_stop requester_bus_id has ]
     ]
   ]
 
-  show "all possible routes and their utilities"
+  ; show "all possible routes and their utilities"
   foreach utils_routes [
-    show item 1 ?
-    show item 0 ?
+    ; show item 1 ?
+    ; show item 0 ?
   ]
 
   ; get the route with max utility
   let idx position ( max slice 0 utils_routes ) slice 0 utils_routes
   let route item 1 (item idx utils_routes)
   let would_have item 2 (item idx utils_routes)
-  
-  show ( word "route to take " route )
-  
-  show ( word "utils_routes" utils_routes )
-  show ( word "slice 1 utils_routes" slice 1 utils_routes )
-  
+
+  ; show ( word "route to take " route )
+
+  ; show ( word "utils_routes" utils_routes )
+  ; show ( word "slice 1 utils_routes" slice 1 utils_routes )
+
   ; determine dropoff_intent
   ; the passengers we're supposed to drop off at a station are those that have a flag "p" on this station, but have a flag "d" on the next one
-  set dropoff_intent_requester []
+  let dropoff_intent_requester []
   set iter n-values ( levels - 1 ) [ ? + 1 ]
   foreach iter [
     let route_so_far sublist route 0 ?
-    show ( word "route so far" route_so_far )
-    set idx position route_so_far slice 1 utils_routes 
+    ; show ( word "route so far" route_so_far )
+    set idx position route_so_far slice 1 utils_routes
     let would_have_from item 2 ( item idx utils_routes )
-    show ( word "would_have_from " would_have_from )
-    
+    ; show ( word "would_have_from " would_have_from )
+
     set route_so_far sublist route 0 ( ? + 1 )
-    set idx position route_so_far slice 1 utils_routes 
+    set idx position route_so_far slice 1 utils_routes
     let would_have_to item 2 ( item idx utils_routes )
-    show ( word "route so far (towards) " route_so_far )
-    show ( word "would_have_from " would_have_to )
-    
+    ; show ( word "route so far (towards) " route_so_far )
+    ; show ( word "would_have_from " would_have_to )
+
     let dropoff_here []
     foreach would_have_from [
-      show ?
+      ; show ?
       if item 2 ? = "b" [
-        let pass_id item 0 ? 
-        
-        show ( word "trying to add " pass_id " to dropoff_intent" )
-        show item (position pass_id slice 0 would_have_to ) would_have_to
-        
+        let pass_id item 0 ?
+
+        ; show ( word "trying to add " pass_id " to dropoff_intent" )
+        ; show item (position pass_id slice 0 would_have_to ) would_have_to
+
         if item 2 item (position pass_id slice 0 would_have_to ) would_have_to = "d" [
-         set dropoff_here lput pass_id dropoff_here 
-        ]        
+         set dropoff_here lput pass_id dropoff_here
+        ]
       ]
     ]
     set dropoff_intent_requester lput dropoff_here dropoff_intent_requester
-  ]  
-  show ( word "dropof_intent " dropoff_intent_requester )
-  
+  ]
+  ; show ( word "dropoff_intent " dropoff_intent_requester )
+
   ; determine pickup_intent_requester
   let pickup_intent_requester slice 0 would_have
-  
+
   ; update has_plan
   ; [ [ pass_id bus_id help from to ]
   ;   ... ]
 
-  foreach pickup_intent_requester [
-    let pass_id ?
+  foreach would_have [
+    let passenger ?
+    let pass_id item 0 ?
     let from "None"
     let toward "None"
     foreach route [
       ; get where this passenger is picked up
       if member? pass_id slice 0 get-passengers-at-stop ? [
-        set from ? 
-        
+        set from ?
+
         ; get where this passenger is going to be dropped of
         set iter n-values length dropoff_intent_requester [ ? ]
         foreach iter [
           if member? pass_id item ? dropoff_intent_requester [
-            set toward ? 
+            set toward ?
           ]
         ]
         if toward = "None" [
-          set toward last route 
+          set toward last route
         ]
-        
+        ;show (word "toward " toward)
         ; get the amount of help provided to this passenger
-        let n_help help pass_id from toward
-        let has_plan_entry ( list pass_id requester_bus_id n_help from toward )  
+        let n_help help passenger from toward
+        let has_plan_entry ( list pass_id requester_bus_id n_help from toward )
         set has_plan lput has_plan_entry has_plan
       ]
     ]
   ]
-  
+
   let return_list ( list route dropoff_intent_requester pickup_intent_requester )
   report return_list
 end
@@ -209,52 +165,87 @@ to-report utility [ bus_stop_from bus_stop_to would_have ]
   ; the utility is defined as the amount of help you can provide for passengers
   ; where help is defined as the reduction in shortest travel distance to the destination from one station to another
   ; if A-->C=7, B-->C=5, then help(A-->B)=2, regardless of the distance between them
-  
-  ; get all the relevant passengers in one list. Ones on board and ones on the current bus stop  
+
+  ; get all the relevant passengers in one list. Ones on board and ones on the current bus stop
   let all_passengers filter [ item 2 ? != "d" ] would_have ; don't consider passengers that we have already modelled to pick up ( in route 2-3-2-3 we pick up passengers at station 2 only once)
   foreach get-passengers-at-stop bus_stop_from [
     ; don't consider passengers that we have already modelled to pick up ( in route 2-3-2-3 we pick up passengers at station 2 only once)
     if (not ( member? (item 0 ?) slice 0 would_have )) [
       ; only consider passengers that other buses don't have a plan for, unless we work with bidding
-      ifelse (member? (item 0 ?) slice 0 has_plan) [ ;or not bid [ 
+      ifelse (member? (item 0 ?) slice 0 has_plan) [ ;or not bid [
         ; or, if another bus had a plan for this passenger we may pick the passenger up if that plan has already been completed
         if item 3 item (position (item 0 ?) slice 0 has_plan) has_plan != bus_stop_from [
            set all_passengers lput ? all_passengers
-        ]  
+        ]
       ][
          set all_passengers lput ? all_passengers
       ]
     ]
   ]
-  
-  show ( word "we're calculating utility from " bus_stop_from " to " bus_stop_to )
-  show ( word "these are all the relevant passengers " all_passengers )
-  
+
+  ; show ( word "we're calculating utility from " bus_stop_from " to " bus_stop_to )
+  ; show ( word "these are all the relevant passengers " all_passengers )
+
   let should_be [] ; the passengers that should be on board are those that could be helped most by this trip
   ; we collect how much we would help a passenger by moving it over this trip, so that we can later take only the top few
   ;
   ; [[ pass_id help ]
-  ;  [ pass_id help ]  
+  ;  [ pass_id help ]
   ;  ... ]
+
+  let changing_plan_passengers []
   foreach all_passengers [
-    set should_be lput ( list item 0 ? help ? bus_stop_from bus_stop_to ) should_be
-  ]  
+
+    ;show ?
+
+    let do False
+    ifelse bid [
+      ifelse member? ? slice 0 has_plan [
+        ; if the help we can offer to this passenger is larger than the help offered by the bus that already had a plan for him/her
+        let idx position ? slice 0 has_plan
+        show "----"
+        show ?
+        if help ? bus_stop_from bus_stop_to > item 2 item idx has_plan [
+          set do True
+
+          ; send message to the bus that was actually helping this passenger that they shouldn't consider him/her anymore
+          let bus_receiver item 1 item idx has_plan
+          set changing_plan_passengers lput ( list ? bus_receiver ) changing_plan_passengers
+        ]
+      ][
+        set do True
+      ]
+    ][
+      set do True
+    ]
+    if do = True [
+      set should_be lput ( list item 0 ? help ? bus_stop_from bus_stop_to ) should_be
+    ]
+  ]
+
   set should_be filter [item 1 ? > 0] should_be ; drop people that we hinder or do not help
   set should_be sort-by [ item 1 ?1 > item 1 ?2 ] should_be ; sort by who we can offer the most help
-  set should_be sublist should_be 0 min (list length should_be bus_capacity) ; the people that should be on board are the people that are helped most by it 
-  
-  show ( word "of which, these should be on board: " should_be )
-  
+  set should_be sublist should_be 0 min (list length should_be bus_capacity) ; the people that should be on board are the people that are helped most by it
+
+  ; if we are transporting passengers that other buses had plans for, let them know ( can only happen if bid = True )
+  foreach changing_plan_passengers [
+    if member? item 0 ? slice 0 should_be [
+      send-message item 1 ? ( list 2 item 0 ? )
+    ]
+  ]
+
+  ; show ( word "of which, these should be on board: " should_be )
+
   ; drop passengers that are not supposed to be on board
   let iter n-values length would_have [ ? ]
   foreach iter [
-    let would_passenger item ? would_have 
+    let would_passenger item ? would_have
     if not(member? ( item 0 would_passenger ) ( slice 0 should_be )) and ( item 2 would_passenger = "b" ) [
       set would_passenger replace-item 2 would_passenger "d"
       set would_have replace-item ? would_have would_passenger
     ]
   ]
-  
+
   ; pickup those passengers that should be on board, but aren't yet
   foreach get-passengers-at-stop bus_stop_from [
     if (member? (item 0 ?) slice 0 should_be) and (not ( member? (item 0 ?) slice 0 would_have )) [
@@ -263,24 +254,23 @@ to-report utility [ bus_stop_from bus_stop_to would_have ]
       set would_have lput would_passenger would_have
     ]
   ]
-  
+
   ; the utility is the total help we can offer passengers with this trip
-;  show slice 1 should_be
+;  ; show slice 1 should_be
   let u sum slice 1 should_be
-  
+
   ; prepare return variables
   let return_list []
   set return_list lput u return_list
   set return_list lput would_have return_list
 
-  show ( word "utility of this trip will be " item 0 return_list " and these would be on board afterward: " item 1 return_list)
+  ; show ( word "utility of this trip will be " item 0 return_list " and these would be on board afterward: " item 1 return_list)
 
   report return_list
 end
 
-to-report help [ passenger bus_stop_from bus_stop_to ] 
+to-report help [ passenger bus_stop_from bus_stop_to ]
   ; help is defined as the reduction in shortest travel distance to the destination from one station to another
   ; if destination is C and A-->C=7, B-->C=5, then help(A-->B)=2, regardless of the distance between A and B
   report ( item bus_stop_from item ( item 1 passenger ) distance_mat ) - ( item bus_stop_to item ( item 1 passenger ) distance_mat )
 end
-
