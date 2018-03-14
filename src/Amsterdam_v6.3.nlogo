@@ -180,6 +180,18 @@ end
 
 to build-connections
   let connections [[15 14 22] [19 23 11] [8] [9 20 4 16] [5 10] [10 17 16] [8] [13 1 17] [9] [20] [17 13 21] [17 16] [20 22 15] [22 23] [23] [18] [] [] [] [23] [21] [22] [] []]
+
+;  ; TEST CASE
+;  let connections [ []
+;              [2]
+;              [1 3 4]
+;              [2 5]
+;              [2]
+;              [3 6 7]
+;              [5]
+;              [5]
+;              [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] ]
+
   let i 0
   foreach connections [
     if length ? > 0 [
@@ -283,8 +295,9 @@ to set-time
 end
 
 to get-daily-ridership-schedule
+  let file_name (word "passengers-location_day1.csv")
 ;  let file_name (word "passengers-location_day4.csv")
-  let file_name "test_case1.csv"
+;  let file_name "test_case1.csv"
   let daily_ridership_schedule parse-file-information file_name
   foreach daily_ridership_schedule [
     let from_bus_stop item 0 ?
@@ -692,7 +705,7 @@ to pick-up-passenger [passenger_id]
           ]
         ]
         [
-          show (word "WARNING: pick-up-passenger             :" "It is impossible to pick up such a passenger:" passenger_id)
+          ; show (word "WARNING: pick-up-passenger             :" "It is impossible to pick up such a passenger:" passenger_id)
         ]
       ]
     ]
@@ -743,7 +756,7 @@ to drop-off-passenger [p_id]
         set passengers replace-item pos_passenger passengers passenger
       ]
       [
-        show (word "WARNING: drop-off-passenger            :" "It is impossible to drop off such a passenger: " p_id)
+        ; show (word "WARNING: drop-off-passenger            :" "It is impossible to drop off such a passenger: " p_id)
       ]
     ]
   ]

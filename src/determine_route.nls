@@ -3,44 +3,34 @@
 ;
 ; All the variables in buses-own and globals can be accessed here
 
-; Upon inferring a route, a bus only considers those passengers that other buses are not already planning to pick up
-; The route to take is the route with the maximum expected utility
-; Utility is based on
+; We choose the route that maximises utility
+; Utility is determined as the total amount of help a bus can offer the passengers
+; Help is the amount of distance units the passenger gets closer to its destination
+; If bidding is deactivated, a bus only considers those passengers that other buses are not already planning to pick up
+; If bidding is activated, a bus will 'bid' on a passenger with the amount of help it can offer him/her
+; If it is higher than the help the previous bus could offer, the bus wins the privilige
 
 ; In order to determine utility for a route that is multiple steps ahead all routes are modelled and utility is determined for each of them
 ; It must be taken into account that a passenger can only be picked up and dropped off once
 
 to-report determine_route [ bus_stop requester_bus_id has ]
-  ; get all possible routes for the amount of levels you have
-  ; determine utility per route
-     ; utility per station
-         ; util a-->b, would-have at B = actual utility(a-->b, would-have at A)
-         ; util b-->c, would-have at C = actual utility(b-->, would-have at B)
-  ; get maximum utility route
-  ; determine dropoff intent based on would-have of max route maybe?
-
+  ; using dynamic programming, find all possible routes and their utilities
+  ; we keep track of which passengers would be on board at any stage in the route
+  ;
+  ; variable 'has' is the initialisation of 'would_have'
   ; would_have like  [ [ pass_id destination "b" ] ( b for on board )
   ;                    [ pass_id destination "d" ] ( d for already dropped off )
   ;                     ... ]
-
+  ;
   ; utils_routes like [ [ util [ station_id station_id ... ] wouldhave at last station ]
   ;                     [ util [ station_id station_id ... ] wouldhave at last station ]
   ;                     ... ]
-
+  ;
   ; dropoff_intent_requester like [ [ pass_id ... ]
-  ;                       [ pass_id ... ]
-  ;                       ... ] where the entries coincide with the bus stops in the variable route. There is no dropoff_intent for the last stop on the route
-
-  ; initialse some variables
-
-  ; show ( word "current bus passengers: " bus_passengers )
-
-;  let has [] ; the people the bus HAS on board is the starting point for keeping track of which passengers the bus WOULD HAVE on board at various points in the route
-;  foreach bus_passengers [
-;    let passenger ?
-;    set passenger lput "b" passenger ; b stands for 'actually on board' as opposed to d; 'already dropped off'
-;    set has lput passenger has
-;  ]
+  ;                                 [ pass_id ... ]
+  ;                                  ... ]
+  ;                          where the entries coincide with the bus stops in the variable route.
+  ;                          There is no dropoff_intent for the last stop on the route
 
   ; initialise utils_routes
   ; [ [ util [ station_id station_id ... ] wouldhave at last station ] ]
@@ -53,8 +43,8 @@ to-report determine_route [ bus_stop requester_bus_id has ]
     let lvl ?
     foreach utils_routes [
       let route_so_far item 1 ?
-      ; show route_so_far
       if length route_so_far = 1 + lvl [
+        ; extend routes
         let u item 0 ?
         let would_have item 2 ?
         let from last route_so_far
@@ -70,16 +60,18 @@ to-report determine_route [ bus_stop requester_bus_id has ]
     ]
   ]
 
-  ; show "all possible routes and their utilities"
-  foreach utils_routes [
-    ; show item 1 ?
-    ; show item 0 ?
-  ]
+;  ; show "all possible routes and their utilities"
+;  foreach utils_routes [
+;    show item 1 ?
+;    show item 0 ?
+;  ]
 
   ; get the route with max utility
-  let idx position ( max slice 0 utils_routes ) slice 0 utils_routes
-  let route item 1 (item idx utils_routes)
-  let would_have item 2 (item idx utils_routes)
+  let utils_routes_of_length filter [ length item 1 ? = (levels + 1) ] utils_routes
+  
+  let idx position ( max slice 0 utils_routes_of_length ) slice 0 utils_routes_of_length
+  let route item 1 (item idx utils_routes_of_length)
+  let would_have item 2 (item idx utils_routes_of_length)
 
   ; show ( word "route to take " route )
 
@@ -89,23 +81,19 @@ to-report determine_route [ bus_stop requester_bus_id has ]
   ; determine dropoff_intent
   ; the passengers we're supposed to drop off at a station are those that have a flag "p" on this station, but have a flag "d" on the next one
   let dropoff_intent_requester []
-  set iter n-values ( levels - 1 ) [ ? + 1 ]
+  ;aset iter n-values ( levels - 1 ) [ ? + 1 ]
+  set iter n-values levels [ ? + 1 ]
   foreach iter [
     let route_so_far sublist route 0 ?
-    ; show ( word "route so far" route_so_far )
     set idx position route_so_far slice 1 utils_routes
     let would_have_from item 2 ( item idx utils_routes )
-    ; show ( word "would_have_from " would_have_from )
 
     set route_so_far sublist route 0 ( ? + 1 )
     set idx position route_so_far slice 1 utils_routes
     let would_have_to item 2 ( item idx utils_routes )
-    ; show ( word "route so far (towards) " route_so_far )
-    ; show ( word "would_have_from " would_have_to )
 
     let dropoff_here []
     foreach would_have_from [
-      ; show ?
       if item 2 ? = "b" [
         let pass_id item 0 ?
 
@@ -156,8 +144,8 @@ to-report determine_route [ bus_stop requester_bus_id has ]
       ]
     ]
   ]
-
-  let return_list ( list route dropoff_intent_requester pickup_intent_requester )
+  
+  let return_list ( list but-first route dropoff_intent_requester pickup_intent_requester )
   report return_list
 end
 
@@ -203,8 +191,6 @@ to-report utility [ bus_stop_from bus_stop_to would_have ]
       ifelse member? ? slice 0 has_plan [
         ; if the help we can offer to this passenger is larger than the help offered by the bus that already had a plan for him/her
         let idx position ? slice 0 has_plan
-        show "----"
-        show ?
         if help ? bus_stop_from bus_stop_to > item 2 item idx has_plan [
           set do True
 

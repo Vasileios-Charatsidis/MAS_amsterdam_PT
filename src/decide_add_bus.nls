@@ -29,7 +29,6 @@ to decide_add_bus
     ; count the amount of unaccounted-for passengers and total passengers
     let decision False
     let total_waiting 0
-    let total_accounted 0
     let num_stations length graph - 1
     let stations n-values num_stations [?]
 
@@ -37,9 +36,8 @@ to decide_add_bus
       if length get-passengers-at-stop ? > 0 [
         set total_waiting total_waiting + length get-passengers-at-stop ?
       ]
-      set total_accounted total_accounted + length item ? has_plan 
     ]
-    set total_accounted total_accounted ; + length dropoff_intent
+    let total_accounted length has_plan
 
     ; determine unaccounted-for passengers
     let planless total_waiting - total_accounted 
