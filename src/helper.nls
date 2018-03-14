@@ -15,7 +15,6 @@ to-report passenger-count-at-bus-stop [ bus_stop ]
 
   let passengers_at_stop get-passengers-at-stop bus_stop
   report length passengers_at_stop
-
 end
 
 to-report linear_fit [ l ]
@@ -59,7 +58,7 @@ end
 to-report slice [ i l ]
   let s []
   foreach l [
-    set s fput item i ? s
+    set s lput item i ? s
   ]
   report s
 end
@@ -73,3 +72,8 @@ to-report member_nested_list [ i l ]
   ]
   report bool
 end
+
+;to-report sort-by-index [ i l ]
+;  
+;  report sorted
+;end

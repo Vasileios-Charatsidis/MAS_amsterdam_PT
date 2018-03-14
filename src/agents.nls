@@ -20,8 +20,10 @@ buses-own [
   has_plan        ; ID's of passengers for which another bus already has a plan, passengers that don't need to be picked up by you. list of lists. list per bus stop
   dropped_off     ; ID's of the passengers that have been dropped of since the last sent message
   planless_hist   ; The history of how many passengers were planless up to some amount of ticks in the past
+  distance_mat    ; a matrix containing the shortest distance from one bus stop to the other (also considering paths that are not directly connected)
   night_team      ; a list of buses to be added at 0:00
   morning_team    ; a list of buses to be added at 6:00
+  bid             ; a boolean signifying whether we are working with bids or not
 
   total_ticks_per_day 
   planless_threshold ; The amount of unaccounted-for passengers above which we decide to add a new bus
@@ -46,16 +48,16 @@ to init-buses
               [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]
   ]
   
-;  ; graph for the test-case
-;  set graph [ [] 
-;              [2]
-;              [1 3 4]
-;              [2 5]
-;              [2]
-;              [3 6 7]
-;              [5]
-;              [5]
-;              [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] ]             
+  ; graph for the test-case
+  set graph [ [] 
+              [2]
+              [1 3 4]
+              [2 5]
+              [2]
+              [3 6 7]
+              [5]
+              [5]
+              [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] ]             
 
   ; hyperparameters of the algorithm
   set levels 3
@@ -69,9 +71,23 @@ to init-buses
   set dropped_off []
   set planless_hist n-values 10 [0]
   set known_route []
-  set has_plan [ [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] ]
-  set dropoff_intent []
+  set has_plan n-values 24 [ ["empty" ] ]
+  set has_plan [ ["empty"] ["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"]["empty"] ]
+  set dropoff_intent [[]]
   set dropped_off []
+  
+  ; distance mat for test-case
+  let row n-values 24 [ random 3 ]
+  set distance_mat n-values 24 [ row ] 
+  
+  show "distance_mat is set to test_case"
+  set distance_mat replace-item 1 distance_mat [1 0 2 4 4 6 8 8 ]
+  set distance_mat replace-item 2 distance_mat [1 2 0 2 2 4 6 6 ]
+  set distance_mat replace-item 3 distance_mat [1 4 2 0 4 2 4 4 ]
+  set distance_mat replace-item 4 distance_mat [1 4 2 4 0 6 8 8 ]
+  set distance_mat replace-item 5 distance_mat [1 6 4 2 6 0 2 2 ]
+  set distance_mat replace-item 6 distance_mat [1 8 6 4 8 2 0 4 ]
+  set distance_mat replace-item 7 distance_mat [1 8 6 4 8 2 4 0 ]
   
   ; init bus-teams
   set night_team [ 1 2 3 ] 
@@ -83,6 +99,9 @@ to execute-actions
   
   ; decide whether to add a new bus this tick
   decide_add_bus
+  
+  ; handle whether this bus wants a route or is the oracle and must give a route
+  plan_routes
 
   if current_stop > -1 [ ; if the bus is at a stop
     
@@ -97,13 +116,13 @@ to execute-actions
         pick-up-passenger item 0 ?
       ] 
     ]
-
-    ; if route has been completed, plan a new route
-    if length known_route = 0 [
-      read
-      set known_route determine_route current_stop levels 
-      send
-    ]
+    
+;    ; if route has been completed, plan a new route
+;    if length known_route = 0 [
+;      read
+;      set known_route determine_route current_stop levels 
+;      send
+;    ]
 
     ; follow route
     set next_stop item 0 known_route
