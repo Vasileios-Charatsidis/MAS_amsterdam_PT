@@ -26,6 +26,7 @@ buses-own [
   morning_team    ; a list of buses to be added at 6:00
   bid             ; a boolean signifying whether we are working with bids or not
   sent            ; keep track of whether we have sent a message so that we don't send a redundant double message while waiting for a reply
+  
 
   total_ticks_per_day
   planless_threshold ; The amount of unaccounted-for passengers above which we decide to add a new bus
@@ -80,7 +81,7 @@ to init-buses
   ;set has_plan n-values 24 [ ["empty" ] ]
   set has_plan []
   set dropoff_intent n-values levels [ ["empty"] ]
-  set dropped_off []
+
 
 ;  ; distance mat for test-case
 ;  let row n-values 24 [ random 3 ]
@@ -138,6 +139,9 @@ to execute-actions
     if length dropoff_intent > 0 [
       foreach item 0 dropoff_intent [
         drop-off-passenger ?
+        
+        set dropped_off lput ? dropped_off
+        
       ]
       set dropoff_intent but-first dropoff_intent
     ]

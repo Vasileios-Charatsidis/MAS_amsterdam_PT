@@ -60,7 +60,8 @@ to communication
 
        ; send-message 24 ( list current_stop has )
        set sent True
-       send-message 24 ( list next_stop has )
+       send-message 24 ( list next_stop has dropped_off)
+       set dropped_off []
     ]
 
     foreach inbox [
