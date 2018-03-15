@@ -64,7 +64,7 @@ to init-buses
   ; hyperparameters of the algorithm
   set levels 3
   set total_ticks_per_day 1440
-  set planless_threshold 100
+  set planless_threshold 0.5
   set need_thresh_1 0.0
   set need_thresh_2 2.0
   set need_thresh_3 5.0

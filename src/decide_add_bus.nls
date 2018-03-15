@@ -11,6 +11,11 @@
 ; at 6:00, a 'morning-team' of buses is added
 
 
+;TODO
+
+; need to update has_plan otherwise negatives
+;
+
 to decide_add_bus
   if bus_id = 24 [ ; bus 24 is the 'president bus'
     
@@ -40,7 +45,7 @@ to decide_add_bus
     let total_accounted length has_plan
 
     ; determine unaccounted-for passengers
-    let planless total_waiting - total_accounted 
+    let planless total_accounted / (total_waiting + total_accounted)
     
 ;    show ( word "total waiting " total_waiting )
 ;    show ( word "total accounted " total_accounted )
@@ -49,10 +54,13 @@ to decide_add_bus
 
     ; keep track of growth of unaccounted-for people to help decide what size bus to add
     set planless_hist lput planless but-first planless_hist
+    
 
     ; if we need to add a bus, determine what size
-    if planless > planless_threshold [
+    if planless < planless_threshold [
+      ;show  (word "planless fraction " planless)
       let need new_bus_need planless_hist
+      ;show (word "need param" need)
       if need > need_thresh_1 [
         ifelse need > need_thresh_2 [
           ifelse need > need_thresh_3 [
