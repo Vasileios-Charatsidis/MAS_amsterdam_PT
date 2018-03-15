@@ -10,6 +10,12 @@
 
 to communication
   ifelse bus_id = 24 [ ; if this bus is the oracle
+    
+    ; code for test_case 3:
+    if test_case [
+      show ( word "has_plan " has_plan )
+    ]
+        
     foreach inbox [
        if item 0 ? = ticks - 1 [ ; only consider 'fresh' messages
          ; unpack message
@@ -17,10 +23,14 @@ to communication
          let msg item 2 ?
          let bus_stop item 0 msg
          let has item 1 msg
-         
+         let dropped_off_sender item 2 msg 
+
+         ; maintain has_plan to prevent this variable from blowing up
+         maintain_has_plan dropped_off_sender 
+
          ; determine route for the requester
          let return_list determine_route bus_stop requester_bus_id has ; ( messages regarding bidding are included in the determine_route function )
-         
+
          ; send message to the requester
          let route item 0 return_list
          let dropoff_intent_requester item 1 return_list
@@ -28,7 +38,7 @@ to communication
          send-message requester_bus_id ( list 1 route dropoff_intent_requester pickup_intent_requester )
        ]
     ]
-
+       
    if length known_route = 0 and current_stop > -1 [
      let has []
      foreach bus_passengers [
@@ -38,7 +48,7 @@ to communication
      ]
      ; determine route for oracle
      let return_list determine_route current_stop 24 has; ( messages regarding bidding are included in the determine_route function )
-     
+
      set known_route item 0 return_list
      set dropoff_intent item 1 return_list
      set pickup_intent item 2 return_list
@@ -58,10 +68,8 @@ to communication
          set has lput passenger has
        ]
 
-       ; send-message 24 ( list current_stop has )
        set sent True
        send-message 24 ( list next_stop has dropped_off)
-       set dropped_off []
     ]
 
     foreach inbox [

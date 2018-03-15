@@ -68,7 +68,7 @@ to-report determine_route [ bus_stop requester_bus_id has ]
 
   ; get the route with max utility
   let utils_routes_of_length filter [ length item 1 ? = (levels + 1) ] utils_routes
-  
+
   let idx position ( max slice 0 utils_routes_of_length ) slice 0 utils_routes_of_length
   let route item 1 (item idx utils_routes_of_length)
   let would_have item 2 (item idx utils_routes_of_length)
@@ -97,9 +97,6 @@ to-report determine_route [ bus_stop requester_bus_id has ]
       if item 2 ? = "b" [
         let pass_id item 0 ?
 
-        ; show ( word "trying to add " pass_id " to dropoff_intent" )
-        ; show item (position pass_id slice 0 would_have_to ) would_have_to
-
         if item 2 item (position pass_id slice 0 would_have_to ) would_have_to = "d" [
          set dropoff_here lput pass_id dropoff_here
         ]
@@ -107,7 +104,6 @@ to-report determine_route [ bus_stop requester_bus_id has ]
     ]
     set dropoff_intent_requester lput dropoff_here dropoff_intent_requester
   ]
-  ; show ( word "dropoff_intent " dropoff_intent_requester )
 
   ; determine pickup_intent_requester
   let pickup_intent_requester slice 0 would_have
@@ -144,7 +140,7 @@ to-report determine_route [ bus_stop requester_bus_id has ]
       ]
     ]
   ]
-  
+
   let return_list ( list but-first route dropoff_intent_requester pickup_intent_requester )
   report return_list
 end
@@ -159,10 +155,10 @@ to-report utility [ bus_stop_from bus_stop_to would_have ]
   foreach get-passengers-at-stop bus_stop_from [
     ; don't consider passengers that we have already modelled to pick up ( in route 2-3-2-3 we pick up passengers at station 2 only once)
     if (not ( member? (item 0 ?) slice 0 would_have )) [
-      ; only consider passengers that other buses don't have a plan for, unless we work with bidding
-      ifelse (member? (item 0 ?) slice 0 has_plan) [ ;or not bid [
-        ; or, if another bus had a plan for this passenger we may pick the passenger up if that plan has already been completed
-        if item 3 item (position (item 0 ?) slice 0 has_plan) has_plan != bus_stop_from [
+      ; only consider passengers that other buses don't have a plan for, unless we work with bidding     
+      ifelse (member? (item 0 ?) slice 0 has_plan) or not bid [
+        ; or, if another bus had a plan for this passenger we may pick the passenger up if that plan has already been completed        
+        if item 2 item (position (item 0 ?) slice 0 has_plan) has_plan != bus_stop_from [
            set all_passengers lput ? all_passengers
         ]
       ][
@@ -180,17 +176,20 @@ to-report utility [ bus_stop_from bus_stop_to would_have ]
   ; [[ pass_id help ]
   ;  [ pass_id help ]
   ;  ... ]
-
+  
   let changing_plan_passengers []
   foreach all_passengers [
-
-    ;show ?
-
     let do False
-    ifelse bid [
-      ifelse member? ? slice 0 has_plan [
+    ifelse bid [      
+      ifelse member? (item 0 ?) slice 0 has_plan [
         ; if the help we can offer to this passenger is larger than the help offered by the bus that already had a plan for him/her
-        let idx position ? slice 0 has_plan
+        let idx position (item 0 ?) slice 0 has_plan
+        
+        if test_case [
+          show ( word "the amount of help I could give this passenger " help ? bus_stop_from bus_stop_to )
+          show ( word "the amount of help the other bus is planning to provide " item 2 item idx has_plan )
+        ]
+        
         if help ? bus_stop_from bus_stop_to > item 2 item idx has_plan [
           set do True
 
@@ -215,12 +214,16 @@ to-report utility [ bus_stop_from bus_stop_to would_have ]
 
   ; if we are transporting passengers that other buses had plans for, let them know ( can only happen if bid = True )
   foreach changing_plan_passengers [
-    if member? item 0 ? slice 0 should_be [
-      send-message item 1 ? ( list 2 item 0 ? )
+    let pass_id item 0 item 0 ?
+    if member? pass_id slice 0 should_be [
+      if not test_case [
+        if item 1 ? != 24 [
+          send-message item 1 ? ( list 2 pass_id )
+        ]
+      ]
+      maintain_has_plan (list pass_id)
     ]
   ]
-
-  ; show ( word "of which, these should be on board: " should_be )
 
   ; drop passengers that are not supposed to be on board
   let iter n-values length would_have [ ? ]
@@ -257,6 +260,18 @@ end
 
 to-report help [ passenger bus_stop_from bus_stop_to ]
   ; help is defined as the reduction in shortest travel distance to the destination from one station to another
-  ; if destination is C and A-->C=7, B-->C=5, then help(A-->B)=2, regardless of the distance between A and B
+  ; if destination is C and A-->C=7, B-->C=5, then help(A-->B)=2, regardless of the distance between A and B  
   report ( item bus_stop_from item ( item 1 passenger ) distance_mat ) - ( item bus_stop_to item ( item 1 passenger ) distance_mat )
+end
+
+to maintain_has_plan [ dropped_off_by_bus ]
+  if length has_plan > 0 [
+    foreach dropped_off_by_bus [
+      let idx position ? slice 0 has_plan
+      
+      if idx != false [
+        set has_plan remove-item idx has_plan
+      ]
+    ]
+  ]
 end
