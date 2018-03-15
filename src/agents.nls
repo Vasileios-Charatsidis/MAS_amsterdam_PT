@@ -1,10 +1,9 @@
-__includes ["determine_route.nls" "decide_add_bus.nls" "messaging.nls" "helper.nls" ]
+__includes [ "new_world.nls" "helper_new.nls" ]
 
 buses-own [
   ; Static, read-only variables. These values never change. You can read them, but you cannot change them.
   bus_id          ; The ID of a given agent (bus). Each agent has a unique ID.
   bus_type        ; The type of a given agent (bus). 1 means "small", 2 means "medium" and 3 means "large".
-
   ; Dynamic, read-only variables. These values may change over time. You can read them, but you cannot change them.
   inbox           ; List containing all the incoming messages (a given message is a list like this [tick sender message]).
   bus_passengers  ; List containing all the passengers that the agent (bus) is currently carrying (represented as a list like this [passenger_id bus_stop]).
@@ -13,26 +12,15 @@ buses-own [
   next_stop       ; ID of the bus stop the agent (bus) is traveling to (-1 means that the agent is not travelling to any bus stop).
 
   ; local variables
-  add_buses       ; if true, add buses
-  levels          ; hyperparameter for the depth of the graph
   known_route     ; Assessed route for this bus (with respect to levels hyperparam)
-  dropoff_intent  ; ID's of the passengers for which this bus has plans
-  pickup_intent   ; ID's of the passengers to pick up
-  has_plan        ; ID's of passengers for which another bus already has a plan, passengers that don't need to be picked up by you. list of lists. list per bus stop
-  dropped_off     ; ID's of the passengers that have been dropped of since the last sent message
-  planless_hist   ; The history of how many passengers were planless up to some amount of ticks in the past
   distance_mat    ; a matrix containing the shortest distance from one bus stop to the other (also considering paths that are not directly connected)
   night_team      ; a list of buses to be added at 0:00
   morning_team    ; a list of buses to be added at 6:00
-  bid             ; a boolean signifying whether we are working with bids or not
-  sent            ; keep track of whether we have sent a message so that we don't send a redundant double message while waiting for a reply
-  
 
-  total_ticks_per_day
-  planless_threshold ; The amount of unaccounted-for passengers above which we decide to add a new bus
-  need_thresh_1      ; The angle of growth of unaccounted-for passengers above which we decide to add a bus of type 1
-  need_thresh_2      ; The angle of growth of unaccounted-for passengers above which we decide to add a bus of type 2
-  need_thresh_3      ; The angle of growth of unaccounted-for passengers above which we decide to add a bus of type 3
+  ; ORACLE exclusive
+  total_capacity  ; total capacity in the world
+  position_belief ; belief of positions of all buses
+  add_bus_threshold
 ]
 
 
@@ -51,50 +39,6 @@ to init-buses
               [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]
   ]
 
-;  ; graph for the test-case
-;  set graph [ []
-;              [2]
-;              [1 3 4]
-;              [2 5]
-;              [2]
-;              [3 6 7]
-;              [5]
-;              [5]
-;              [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] [] ]
-
-  ; hyperparameters of the algorithm
-  set levels 3
-  set total_ticks_per_day 1440
-  set planless_threshold 0.5
-  set need_thresh_1 0.0
-  set need_thresh_2 2.0
-  set need_thresh_3 5.0
-  set bid False
-
-  ; initialisation of bus-own variables
-  set sent False
-  set dropped_off []
-  set pickup_intent []
-  set planless_hist n-values 10 [0]
-  ;set known_route []
-  set known_route ( list one-of item 3 graph )
-  ;set has_plan n-values 24 [ ["empty" ] ]
-  set has_plan []
-  set dropoff_intent n-values levels [ ["empty"] ]
-
-
-;  ; distance mat for test-case
-;  let row n-values 24 [ random 3 ]
-;  set distance_mat n-values 24 [ row ]
-;   show "distance_mat is set to test_case"
-;  set distance_mat replace-item 1 distance_mat [1 0 2 4 4 6 8 8 ]
-;  set distance_mat replace-item 2 distance_mat [1 2 0 2 2 4 6 6 ]
-;  set distance_mat replace-item 3 distance_mat [1 4 2 0 4 2 4 4 ]
-;  set distance_mat replace-item 4 distance_mat [1 4 2 4 0 6 8 8 ]
-;  set distance_mat replace-item 5 distance_mat [1 6 4 2 6 0 2 2 ]
-;  set distance_mat replace-item 6 distance_mat [1 8 6 4 8 2 0 4 ]
-;  set distance_mat replace-item 7 distance_mat [1 8 6 4 8 2 4 0 ]
-  
   set distance_mat [[0 18.1085370140267 31.6327052439869 21.4946426457950 18.3323649856266 16.3956231322022 34.2316371008528 24.3754810957648 27.1605692889873 23.9982916288189 13.2333454720339 22.1085370140267 13.7924234729030 10.2333454720339 7.28010988928052 4.12310562561766 20.6382638193215 21.2333454720339 10.2058681559159 20.1085370140267 19.8751860032013 19.5579007923706 3.16227766016838 10.1085370140267]
                   [18.1085370140267  0  22.0327592528361  11.2360679774998  14.3983456376682  13.2426406871193  24.6316911097020  6.32455532033676  17.5606232978366  14.3983456376682  16.4049183472877  4  24.3898983196635  15.2111025509280  10.8284271247462  22.2316426396444  9  11.4235748339295  28.3144051699426  2.23606797749979  18.3071357893653  22.5497764764846  21.2708146741951  8]
                   [31.6327052439869  22.0327592528361  0  10.7966912753363  13.9589689355047  16.7873960602509  11.5432037668651  27.9691781041419  4.47213595499958  7.63441361516796  19.0579884490975  18.0327592528361  17.8402817710838  22.0579884490975  32.0975181247717  31.9824173948148  13.0327592528361  22.8701585905491  38.0651799251130  24.2688272303359  11.7575192407856  16.0001599279049  28.4704275838185  29.2690910000255]
@@ -120,63 +64,39 @@ to init-buses
                   [3.16227766016838  21.2708146741951  28.4704275838185  18.3323649856266  15.1700873254583  13.2333454720339  31.0693594406844  21.2132034355964  23.9982916288189  20.8360139686505  10.0710678118655  22.4759861591531  10.6301458127347  7.07106781186548  10.4423875494489  7.28538328578604  17.4759861591531  18.0710678118655  13.3681458160843  23.2708146741951  16.7129083430329  16.3956231322022  0  13.2708146741951]
                   [10.1085370140267  8  29.2690910000255  18.4723997246891  15.3101220645208  13.3733802110964  31.8680228568914  14.3245553203368  24.7969550450259  21.6346773848575  10.2111025509280  12  23.9009604869297  7.21110255092798  2.82842712474619  14.2316426396444  17  18.2111025509280  20.3144051699426  10  20.7782985583840  16.5356578712647  13.2708146741951  0] ]
 
-  ; init bus-teams
   set night_team [ 1 1 1 ]
-  ; set night_team [ 1 ] 
   set morning_team [ 3 3 3 3 3 3 2 2 2 2 2 1 1 1 1 1 ]
+  set total_capacity bus_capacity
+  set add_bus_threshold 0.9
+  ;set position_belief n-values 24 []   ; FIXME
+
+  if bus_id > 24 [
+    send_vote
+  ]
 
 end
 
-to execute-actions  
-  ; decide whether to add a new bus this tick
+
+to execute-actions
+
+  check_inbox
   decide_add_bus
+  decide_send_bid
+  give_route
 
-  ; handle whether this bus wants a route or is the oracle and must give a route
-  communication
+  if current_stop > -1 [
 
-  if current_stop > -1 [ ; if the bus is at a stop
-    ; drop off
-    if length dropoff_intent > 0 [
-      foreach item 0 dropoff_intent [
-        drop-off-passenger ?
-        
-        set dropped_off lput ? dropped_off
-        
-      ]
-      set dropoff_intent but-first dropoff_intent
-    ]
-
-    let picked_up []
-    let passengers_at_stop get-passengers-at-stop current_stop
-
-    ; pick up passengers
-    foreach pickup_intent [
-      if member? ? slice 0 passengers_at_stop [
-        pick-up-passenger ?
-        set picked_up lput ? picked_up
-      ]
-    ]
-    
-    ; remove picked up passengers
-    foreach picked_up [
-      set pickup_intent remove ? pickup_intent
-    ]
-
-    ; follow route
-    if length known_route > 0 [
+    ifelse length known_route = 0 [
+      set next_stop choose_next_stop
+    ] [
       set next_stop item 0 known_route
-      set known_route but-first known_route  ; remove the first element of the known_route
+      set known_route but-first known_route
     ]
+
+    dropoff_passengers
+    pickup_passengers
   ]
 
   travel-to next_stop
-  
-;  if bus_id = 25 [
-;    show "-----------"  
-;    show ( word "previous " previous_stop " current " current_stop " next " next_stop )
-;    show ( word "route" known_route )
-;    show ( word "dropoff intent " dropoff_intent )
-;    show " "
-;  ]
 
 end

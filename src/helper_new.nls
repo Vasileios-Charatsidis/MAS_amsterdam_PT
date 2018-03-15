@@ -1,0 +1,42 @@
+to-report total_passenger_count
+
+  let total_waiting 0
+  let stations n-values 24 [?]
+
+  foreach stations [
+    if length get-passengers-at-stop ? > 0 [
+      set total_waiting total_waiting + length get-passengers-at-stop ?
+    ]
+  ]
+
+  report total_waiting
+
+end
+
+to-report free_spaces_on_bus
+  ; Compute the number of free spaces on the bus
+  ; Return:
+  ;   @number: free spaces
+
+  let capacity bus_capacity
+
+  report capacity - length bus_passengers
+end
+
+to-report bus_capacity
+  ; Return:
+  ;   @capacity: the capacity of the bus based on its type
+
+  let capacity 0
+
+  ifelse bus_type = 1 [
+    set capacity 12
+  ] [
+    ifelse bus_type = 2 [
+      set capacity 60
+    ] [
+      set capacity 150
+    ]
+  ]
+  report capacity
+end

@@ -1,0 +1,186 @@
+to send_vote
+  ; On creation of a bus send a vote to the oracle
+
+  let message list "vote" bus_capacity
+  send-message 24 message
+
+end
+
+
+to check_inbox
+  ; Process the messages in the inbox
+
+  ifelse bus_id = 24 [
+    foreach inbox [
+      ; check if vote
+      let message item 2 ?
+
+      if item 0 message = "vote" [
+        set total_capacity (total_capacity + item 1 message)
+      ]
+
+      if item 0 message = "bid" [
+        ; TODO add position to position_belief
+      ]
+    ]
+
+    set inbox []
+
+  ] [
+
+  ]
+
+end
+
+
+to decide_add_bus
+  ; Only oracle can decide to add buses to system
+
+  if bus_id = 24 [
+    let decision_ratio (total_capacity / (total_capacity + total_passenger_count))
+    if decision_ratio < add_bus_threshold [
+      add-bus 2
+    ]
+  ]
+
+end
+
+
+to give_route
+  ; Send route to buses
+
+end
+
+
+to-report choose_next_stop
+  ; From the current bus stop, choose the next bus stop to visit
+  ; Currently we choose the bus stop with the maximum number of passengers
+  ; return:
+  ;  @ next_stop
+
+  ; Get the connecting nodes of the current bus stop
+  let connecting_nodes item current_stop graph
+
+  let utilities []
+  let max_utility -1000
+
+  foreach connecting_nodes [
+    ; Get the utility for each of the connecting nodes
+    let u utility ?
+
+    if u > max_utility [
+      set max_utility u
+    ]
+
+    set utilities lput u utilities
+  ]
+
+  ; Get list of max_utilities. If there are multiple stations with the same
+  ; utility, then randomly choose one of those stations
+  let max_utility_indices []
+  let index 0
+
+  foreach utilities [
+    if ? = max_utility [
+      set max_utility_indices lput index max_utility_indices
+    ]
+    set index index + 1
+  ]
+
+  let select_node item random length max_utility_indices max_utility_indices
+
+  report item select_node connecting_nodes
+
+end
+
+
+to-report utility [ bus_stop ]
+
+  let dropoffs 0
+  foreach bus_passengers [
+     if item 1 ? = bus_stop [
+       set dropoffs dropoffs + 1
+     ]
+  ]
+
+  let passengers_at_stop get-passengers-at-stop bus_stop
+
+  ; potential_pickups
+  let potential_pickups min list length passengers_at_stop free_spaces_on_bus
+
+  ; overalapping destinations
+  let bus_destinations n-values 24 [0]
+  foreach bus_passengers [
+    let idx item 1 ?
+    ; set bus_destinations position idx 1
+    set bus_destinations replace-item idx bus_destinations 1
+  ]
+
+  let overlapp 0
+  foreach passengers_at_stop [
+    let destination item 1 ?
+    if destination = 1 [
+        set overlapp (overlapp + 1)
+    ]
+  ]
+
+  ; alpha
+  let alpha free_spaces_on_bus / bus_capacity
+  ; set pickups to mean of possible pickups and number of passengers with same destination as the ones onboard
+  ; only do this if the bus is not empty?
+  let pickups mean list potential_pickups overlapp
+  let utility_value (1 - alpha) * dropoffs + alpha * pickups
+
+  report utility_value
+
+end
+
+
+to dropoff_passengers
+
+  foreach bus_passengers [
+    ifelse item 1 ? = current_stop [
+      drop-off-passenger item 0 ?
+    ] [
+      ; drop off if negative help
+      let h help ? current_stop next_stop
+
+      if h < 0 [
+        drop-off-passenger item 0 ?
+      ]
+    ]
+  ]
+
+end
+
+
+to pickup_passengers
+
+  let free_spaces bus_capacity - (length bus_passengers)
+  let passengers_at_stop get-passengers-at-stop current_stop
+
+  ; Only pickup free_spaces number of passengers
+  repeat min list free_spaces length passengers_at_stop [
+
+    let r_passenger item random length passengers_at_stop passengers_at_stop
+    let h help r_passenger current_stop next_stop
+
+    if h > 0 [
+        pick-up-passenger item 0 r_passenger
+        set free_spaces (free_spaces - 1)
+    ]
+  ]
+
+end
+
+
+to decide_send_bid
+
+end
+
+
+to-report help [ passenger bus_stop_from bus_stop_to ]
+  ; help is defined as the reduction in shortest travel distance to the destination from one station to another
+  ; if destination is C and A-->C=7, B-->C=5, then help(A-->B)=2, regardless of the distance between A and B
+  report ( item bus_stop_from item ( item 1 passenger ) distance_mat ) - ( item bus_stop_to item ( item 1 passenger ) distance_mat )
+end
