@@ -92,7 +92,7 @@ to-report choose_next_stop
   let connecting_nodes item current_stop graph
 
   let utilities []
-  let max_utility -1000
+  let max_utility -1000000
 
   ; 10 percent randomeness added. If 1, then the next stop will be randomly chosen
   let random_route [0 0 0 0 0 0 0 0 0 1]
@@ -170,7 +170,20 @@ to-report utility [ bus_stop ]
   let pickups mean list potential_pickups overlapp
   let utility_value (1 - alpha) * dropoffs + alpha * pickups
 
-  report utility_value
+  ; This is experimental. This adds to the performance signigicantly
+  ; The idea is to go to the node which is nearer to the passengers on board (currently takes the sum)
+  ; It is quite intuitive for the following case:
+  ;    If the number of potential_pickups and potential_dropoffs is the same for multiple nodes,
+  ;    Then choose the node which helps multiple passengers.
+  ; Further work could include choosing the weights of utility_value and total_help.
+  let total_help 0
+  foreach bus_passengers [
+    let h help ? current_stop bus_stop
+
+    set total_help (total_help + h)
+  ]
+
+  report utility_value + total_help
 
 end
 
