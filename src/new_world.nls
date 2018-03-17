@@ -39,7 +39,7 @@ to decide_add_bus
   if bus_id = 24 [
     let decision_ratio (total_capacity / (total_capacity + total_passenger_count))
     if decision_ratio < add_bus_threshold [
-      add-bus 2
+      add-bus ((random 3) + 1)
     ]
   ]
 
@@ -47,38 +47,38 @@ end
 
 
 to give_route
-  
+
 end
 
-to-report get-global-business-extrema
+to-report get_global_business_extrema
   ; reports a list of the id's of the busiest and the calmest station in the system and their respective business
   ; global business of a station is defined as the average of its own business and it's neighboring stations' business
   ;
   ; return_list like [ [ bus_stop_id max_business ]
   ;                    [ bus_stop_id min_business ] ]
-  
+
   let businesses []
-  
+
   ; get every station's neighbourhood business
   let iter n-values 24 [ ? ]
   foreach iter [
     let global_business length get-passengers-at-stop ?
     let connecting_nodes item ? graph
     foreach connecting_nodes [
-      set global_business global_business + length get-passengers-at-stop ? 
+      set global_business global_business + length get-passengers-at-stop ?
     ]
     set global_business global_business / ( length connecting_nodes + 1 )
     set businesses lput global_business businesses
   ]
-  
+
   ; get extrema
   let max_business max businesses
   let min_business min businesses
   let max_idx position max_business businesses
   let min_idx position min_business businesses
-  
+
   ; prepare return_list
-  report ( list ( list max_idx max_business ) ( list min_idx min_business ) )  
+  report ( list ( list max_idx max_business ) ( list min_idx min_business ) )
 end
 
 
@@ -93,6 +93,15 @@ to-report choose_next_stop
 
   let utilities []
   let max_utility -1000
+
+  ; 10 percent randomeness added. If 1, then the next stop will be randomly chosen
+  let random_route [0 0 0 0 0 0 0 0 0 1]
+  let r_idx random length random_route
+
+  if item r_idx random_route = 1 [
+    let random_next_node random length connecting_nodes
+    report item random_next_node connecting_nodes
+  ]
 
   foreach connecting_nodes [
     ; Get the utility for each of the connecting nodes
