@@ -11,7 +11,7 @@ buses-own [
   previous_stop   ; ID of the last bus stop that the agent (bus) visited (-1 means that the agent has not visited any bus stop yet).
   current_stop    ; ID of the bus stop where the agent (bus) currently is (-1 means that the agent is not at any bus stop).
   next_stop       ; ID of the bus stop the agent (bus) is traveling to (-1 means that the agent is not travelling to any bus stop).
-  
+
   ; local variables
   add_buses       ; if true, add buses
   levels          ; hyperparameter for the depth of the graph
@@ -26,7 +26,7 @@ buses-own [
   morning_team    ; a list of buses to be added at 6:00
   bid             ; a boolean signifying whether we are working with bids or not
   sent            ; keep track of whether we have sent a message so that we don't send a redundant double message while waiting for a reply
-  
+
 
   total_ticks_per_day
   planless_threshold ; The amount of unaccounted-for passengers above which we decide to add a new bus
@@ -38,15 +38,15 @@ buses-own [
 
 globals [
   graph
-  
+
   test_case
 ]
 
 
 to init-buses
   ; Initialize Agents
-  
-  set test_case True
+
+  set test_case true
 
   ; This list contains the topology of the entire network of bus stops, which is known to all
   ; agents. This can be used to calculate the shortest path between two bus stops.
@@ -80,21 +80,21 @@ to init-buses
   set pickup_intent []
   set planless_hist n-values 10 [0]
   set known_route []
-  
+
   if not test_case [
     set known_route ( list one-of item 3 graph )
   ]
-  
+
   ;set has_plan n-values 24 [ ["empty" ] ]
   set has_plan []
-  
+
   ; code for test_case 3
   if test_case [
     set has_plan [[0 27 1 3 1 ]]
   ]
-  
+
   set dropoff_intent n-values levels [ [] ]
-   
+
 ; distance mat for test_case 1 and 2
 ;  set distance_mat replace-item 1 distance_mat [1 0 2 4 4 6 8 8 ]
 ;  set distance_mat replace-item 2 distance_mat [1 2 0 2 2 4 6 6 ]
@@ -103,7 +103,7 @@ to init-buses
 ;  set distance_mat replace-item 5 distance_mat [1 6 4 2 6 0 2 2 ]
 ;  set distance_mat replace-item 6 distance_mat [1 8 6 4 8 2 0 4 ]
 ;  set distance_mat replace-item 7 distance_mat [1 8 6 4 8 2 4 0 ]
-  
+
   set distance_mat [[0 18.1085370140267 31.6327052439869 21.4946426457950 18.3323649856266 16.3956231322022 34.2316371008528 24.3754810957648 27.1605692889873 23.9982916288189 13.2333454720339 22.1085370140267 13.7924234729030 10.2333454720339 7.28010988928052 4.12310562561766 20.6382638193215 21.2333454720339 10.2058681559159 20.1085370140267 19.8751860032013 19.5579007923706 3.16227766016838 10.1085370140267]
                   [18.1085370140267  0  22.0327592528361  11.2360679774998  14.3983456376682  13.2426406871193  24.6316911097020  6.32455532033676  17.5606232978366  14.3983456376682  16.4049183472877  4  24.3898983196635  15.2111025509280  10.8284271247462  22.2316426396444  9  11.4235748339295  28.3144051699426  2.23606797749979  18.3071357893653  22.5497764764846  21.2708146741951  8]
                   [31.6327052439869  22.0327592528361  0  10.7966912753363  13.9589689355047  16.7873960602509  11.5432037668651  27.9691781041419  4.47213595499958  7.63441361516796  19.0579884490975  18.0327592528361  17.8402817710838  22.0579884490975  32.0975181247717  31.9824173948148  13.0327592528361  22.8701585905491  38.0651799251130  24.2688272303359  11.7575192407856  16.0001599279049  28.4704275838185  29.2690910000255]
@@ -134,7 +134,7 @@ to init-buses
     let row n-values 24 [ 100 ]
     set distance_mat n-values 24 [ row ]
     show "distance_mat is set to test_case"
-    
+
     set distance_mat replace-item 0 distance_mat [ 0 3 2 2 ]
     set distance_mat replace-item 1 distance_mat [ 3 0 5 1 ]
     set distance_mat replace-item 2 distance_mat [ 2 5 0 4 ]
@@ -143,17 +143,17 @@ to init-buses
 
   ; init bus-teams
   ; set night_team [ 1 1 1 ]
-  set night_team [ 1 ] 
+  set night_team [ 1 ]
   set morning_team [ 3 3 3 3 3 3 2 2 2 2 2 1 1 1 1 1 ]
 
 end
 
-to execute-actions  
+to execute-actions
   ; decide whether to add a new bus this tick
   if not test_case [
     decide_add_bus
   ]
-  
+
   if test_case [
     show ( word "tick " ticks )
   ]
@@ -181,7 +181,7 @@ to execute-actions
         set picked_up lput ? picked_up
       ]
     ]
-    
+
     ; remove picked up passengers
     foreach picked_up [
       set pickup_intent remove ? pickup_intent
