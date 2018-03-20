@@ -98,14 +98,14 @@ to-report choose_next_stop
   let random_route [0 0 0 0 0 0 0 0 0 1]
   let r_idx random length random_route
 
-  if item r_idx random_route = 1 [
+  if (item r_idx random_route = 1) [
     let random_next_node random length connecting_nodes
     report item random_next_node connecting_nodes
   ]
 
   foreach connecting_nodes [
     ; Get the utility for each of the connecting nodes
-    let u utility ?
+    let u utility_iowa_gambling_task ?
 
     if u > max_utility [
       set max_utility u
@@ -184,6 +184,61 @@ to-report utility [ bus_stop ]
   ]
 
   report utility_value + total_help
+
+end
+
+
+to-report utility_iowa_gambling_task [ bus_stop ]
+
+  ; dropoff has two points effectively - 1 from help
+  let dropoffs 0
+  foreach bus_passengers [
+     if item 1 ? = bus_stop [
+       set dropoffs dropoffs + 1  ; dropoff = win: 1 points
+     ]
+  ]
+
+  let total_help 0
+  foreach bus_passengers [
+    let h help ? current_stop bus_stop
+
+    ifelse h > 0 [
+      set total_help (total_help + 1)  ; move towards: 1 point
+    ] [
+      set total_help (total_help - 1)  ; move away: -1 point
+    ]
+
+    set total_help (total_help + h)
+  ]
+
+  ; potential_pickups
+  let passengers_at_stop get-passengers-at-stop bus_stop
+  let potential_pickups min list length passengers_at_stop free_spaces_on_bus  ; pickup: 1 point
+
+  let outcome (dropoffs + potential_pickups + total_help)
+
+  let A 1      ; outcome sensitivity parameter: hyperparam
+  let w 4      ; loss aversion paramter: hyperparam
+  let eps 0.5  ; updating paramter: hyperparam
+
+  ; define a non-linear utility function
+  let subjective_utility 0
+  ifelse outcome >= 0 [
+    set subjective_utility (outcome ^ A)
+  ] [
+    set subjective_utility (- w * ((- outcome) ^ A))
+  ]
+
+  let current_stop_entries item current_stop igt
+  let expected_utility_t item bus_stop current_stop_entries
+
+  ; delta learning rule
+  let new_expected_utility (expected_utility_t + eps * (subjective_utility - expected_utility_t))
+
+  set current_stop_entries replace-item bus_stop current_stop_entries new_expected_utility
+  set igt replace-item current_stop igt current_stop_entries
+
+  report new_expected_utility
 
 end
 
