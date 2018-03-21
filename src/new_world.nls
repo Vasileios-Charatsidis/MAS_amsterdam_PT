@@ -1,12 +1,3 @@
-;to send_vote
-;  ; On creation of a bus send a vote to the oracle
-;
-;  let message list "vote" bus_capacity
-;  send-message 24 message
-;
-;end
-
-
 to check_inbox
   ; Process the messages in the inbox
 
@@ -50,6 +41,7 @@ to check_inbox
   set inbox []
 
 end
+
 
 to add_fixed_buses
   if bus_id = 24 [
@@ -146,9 +138,52 @@ to-report new_bus_need
 end
 
 
-to give_route
+
+
+to-report compute_route_to_destination
+  ; call nw:path-to from current_stop to busiest_stop
+
+  let from_location current_stop
+
+  if from_location = -1 [
+    set from_location next_stop
+  ]
+
+  let route_list 0
+  let route_list2 []
+
+  let b busiest_stop
+  ask bus_stop from_location [set route_list nw:path-to bus_stop b]
+  foreach route_list [
+    ask ? [
+      let temp parse_route (word self)  ; contains required info
+      set route_list2 lput temp route_list2
+    ]
+  ]
+
+  report route_from_nw_list route_list2 from_location
 
 end
+
+
+to decide_add_bus
+  ; Only oracle can decide to add buses to system
+
+  if bus_id = 24 [
+    let decision_ratio (total_capacity / (total_capacity + total_passenger_count))
+    if decision_ratio < add_bus_threshold [
+
+      let r_bus_type ((random 3) + 1)
+
+      set total_buses (total_buses + 1)
+      set total_capacity (total_capacity + bus_capacity r_bus_type)
+
+      add-bus r_bus_type
+    ]
+  ]
+
+end
+
 
 to-report get_global_business_extrema
   ; reports a list of the id's of the busiest and the calmest station in the system and their respective business
@@ -157,19 +192,7 @@ to-report get_global_business_extrema
   ; return_list like [ [ bus_stop_id max_business ]
   ;                    [ bus_stop_id min_business ] ]
 
-  let businesses []
-
-  ; get every station's neighbourhood business
-  let iter n-values 24 [ ? ]
-  foreach iter [
-    let global_business length get-passengers-at-stop ?
-    let connecting_nodes item ? graph
-    foreach connecting_nodes [
-      set global_business global_business + length get-passengers-at-stop ?
-    ]
-    set global_business global_business / ( length connecting_nodes + 1 )
-    set businesses lput global_business businesses
-  ]
+  let businesses compute_business_stops
 
   ; get extrema
   let max_business max businesses
@@ -182,7 +205,7 @@ to-report get_global_business_extrema
 end
 
 
-to-report choose_next_stop
+to-report get_next_stop
   ; From the current bus stop, choose the next bus stop to visit
   ; Currently we choose the bus stop with the maximum number of passengers
   ; return:
@@ -233,61 +256,6 @@ to-report choose_next_stop
 end
 
 
-to-report utility [ bus_stop ]
-
-  let dropoffs 0
-  foreach bus_passengers [
-     if item 1 ? = bus_stop [
-       set dropoffs dropoffs + 1
-     ]
-  ]
-
-  let passengers_at_stop get-passengers-at-stop bus_stop
-
-  ; potential_pickups
-  let potential_pickups min list length passengers_at_stop free_spaces_on_bus
-
-  ; overalapping destinations
-  let bus_destinations n-values 24 [0]
-  foreach bus_passengers [
-    let idx item 1 ?
-    ; set bus_destinations position idx 1
-    set bus_destinations replace-item idx bus_destinations 1
-  ]
-
-  let overlapp 0
-  foreach passengers_at_stop [
-    let destination item 1 ?
-    if destination = 1 [
-        set overlapp (overlapp + 1)
-    ]
-  ]
-
-  ; alpha
-  let alpha free_spaces_on_bus / bus_capacity
-  ; set pickups to mean of possible pickups and number of passengers with same destination as the ones onboard
-  ; only do this if the bus is not empty?
-  let pickups mean list potential_pickups overlapp
-  let utility_value (1 - alpha) * dropoffs + alpha * pickups
-
-  ; This is experimental. This adds to the performance signigicantly
-  ; The idea is to go to the node which is nearer to the passengers on board (currently takes the sum)
-  ; It is quite intuitive for the following case:
-  ;    If the number of potential_pickups and potential_dropoffs is the same for multiple nodes,
-  ;    Then choose the node which helps multiple passengers.
-  ; Further work could include choosing the weights of utility_value and total_help.
-  let total_help 0
-  foreach bus_passengers [
-    let h help ? current_stop bus_stop
-
-    set total_help (total_help + h)
-  ]
-
-  report utility_value + total_help
-
-end
-
-
 to dropoff_passengers
 
   foreach bus_passengers [
@@ -308,7 +276,7 @@ end
 
 to pickup_passengers
 
-  let free_spaces bus_capacity - (length bus_passengers)
+  let free_spaces bus_capacity bus_type - (length bus_passengers)
   let passengers_at_stop get-passengers-at-stop current_stop
 
   ; Only pickup free_spaces number of passengers
@@ -323,16 +291,4 @@ to pickup_passengers
     ]
   ]
 
-end
-
-
-to decide_send_bid
-
-end
-
-
-to-report help [ passenger bus_stop_from bus_stop_to ]
-  ; help is defined as the reduction in shortest travel distance to the destination from one station to another
-  ; if destination is C and A-->C=7, B-->C=5, then help(A-->B)=2, regardless of the distance between A and B
-  report ( item bus_stop_from item ( item 1 passenger ) distance_mat ) - ( item bus_stop_to item ( item 1 passenger ) distance_mat )
 end

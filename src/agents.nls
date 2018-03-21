@@ -14,15 +14,21 @@ buses-own [
   ; local variables
   known_route     ; Assessed route for this bus (with respect to levels hyperparam)
   distance_mat    ; a matrix containing the shortest distance from one bus stop to the other (also considering paths that are not directly connected)
-
-  ; ORACLE exclusive
-  second_opinion  ; a boolean that will allow us to switch voting on and off
   night_team      ; a list of buses to be added at 0:00
   morning_team    ; a list of buses to be added at 6:00
+  busiest_stop    ; the current busiest stop
+  business_stops
+  business_interval;
+  bidding_threshold
+
+  total_orders
+
+  ; ORACLE exclusive
   total_capacity  ; total capacity in the world
-  position_belief ; belief of positions of all buses
-  history         ; an n-tick history of the growth of population needed to infer what size bus to add
+  total_buses     ; total number of buses
+  bids            ; bid of each bus. List of lists  [ [bid_1 bus_id_1] [bid_2 bus_id_2] ... ]
   add_bus_threshold
+  second_opinion
   need_thresh_1   ; above how much 'need' we should add a bus of type 1
   need_thresh_2   ; above how much 'need' we should add a bus of type 2
   need_thresh_3   ; above how much 'need' we should add a bus of type 3
@@ -39,7 +45,8 @@ globals [
 to init-buses
   ; Initialize Agents
 
-  ; General, immutable global/local variables
+  ; This list contains the topology of the entire network of bus stops, which is known to all
+  ; agents. This can be used to calculate the shortest path between two bus stops.
   set graph [ [22 15 14] [11 19 23 7] [8] [16 4 20 9] [3 5 10] [4 16 10 17] [8] [1 17 13]
               [2 6 9] [3 8 20] [4 5 17 13 21] [1 16 17] [20 15 22] [7 10 22 23] [0 23] [0 12 18]
               [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]
@@ -70,14 +77,14 @@ to init-buses
                   [3.16227766016838  21.2708146741951  28.4704275838185  18.3323649856266  15.1700873254583  13.2333454720339  31.0693594406844  21.2132034355964  23.9982916288189  20.8360139686505  10.0710678118655  22.4759861591531  10.6301458127347  7.07106781186548  10.4423875494489  7.28538328578604  17.4759861591531  18.0710678118655  13.3681458160843  23.2708146741951  16.7129083430329  16.3956231322022  0  13.2708146741951]
                   [10.1085370140267  8  29.2690910000255  18.4723997246891  15.3101220645208  13.3733802110964  31.8680228568914  14.3245553203368  24.7969550450259  21.6346773848575  10.2111025509280  12  23.9009604869297  7.21110255092798  2.82842712474619  14.2316426396444  17  18.2111025509280  20.3144051699426  10  20.7782985583840  16.5356578712647  13.2708146741951  0] ]
 
-  ; local variables that can vary between buses
+  set business_interval 30
   set known_route []
   
   ; ORACLE exlusive ( will also be added for other buses, but never used )
   set second_opinion False
   set night_team [ 1 1 1 1 ]
   set morning_team [ 3 3 3  2 2 2 2 2  1 1 1 1 1 1 ]
-  set total_capacity bus_capacity
+
   set add_bus_threshold 0.8
   set history n-values 12 [ 0 ]
   set total_ticks_per_day 1440
@@ -87,28 +94,67 @@ to init-buses
   set need_thresh_3 -.004 ; above how much 'need' we should add a bus of type 3
   ;set position_belief n-values 24 []   ; FIXME
 
+  ; ORACLE exclusive
+  ifelse bus_id = 24 [
+    set bids []
+    set total_capacity bus_capacity bus_type
+    set total_buses 1
+    set add_bus_threshold 0.9
+    set total_orders 0
+  ] [
+    send_vote
+  ]
+
 end
 
 
 to execute-actions
-  
-;  if bus_id = 24 [
-;    show ticks
-;  ]
-  
-  check_inbox ; if votes are in, this function processes them as well
-  add_fixed_buses ; orcale adds night team and morning team
-  decide_start_vote  
-  decide_send_bid
-  give_route
+
+  ; TODO: Possibly set to 1?
+  if (length known_route = 0)[
+    if ticks mod business_interval = 0 [
+      set business_stops compute_business_stops
+
+      let businesses sort business_stops
+      let lower sublist businesses 0 12
+      let upper sublist businesses 12 24
+
+      if mean lower > 0 [
+        let bidding_decision (mean upper) / (mean lower)
+
+        if bidding_decision > bidding_threshold [
+
+          let max_business max businesses
+          set busiest_stop position max_business businesses
+
+          send_bid
+        ]
+      ]
+    ]
+  ]
+
+  check_inbox
+  add_fixed_buses  ; oracle adds night team and morning team
+  decide_start_vote
+
+
+  if ticks mod business_interval = 1 [
+    process_bids
+  ]
 
   if current_stop > -1 [
 
     ifelse length known_route = 0 [
-      set next_stop choose_next_stop
+      set next_stop get_next_stop
     ] [
       set next_stop item 0 known_route
       set known_route but-first known_route
+
+      if next_stop = current_stop [
+        set next_stop item 0 known_route
+        set known_route but-first known_route
+      ]
+
     ]
 
     dropoff_passengers

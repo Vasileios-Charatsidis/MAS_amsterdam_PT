@@ -1,0 +1,88 @@
+to send_vote
+  ; On creation of a bus send a vote to the oracle
+
+  let message list "vote" bus_capacity bus_type
+  send-message 24 message
+
+end
+
+
+to send_bid
+  ; Send a bid to the busiest_stop
+
+  if bus_id > 24 [
+
+    let from_location current_stop
+
+    if from_location = -1 [
+      set from_location next_stop
+    ]
+
+    let bid item busiest_stop (item from_location distance_mat)
+    let message list "bid" bid
+    send-message 24 message
+  ]
+
+end
+
+
+to check_inbox
+  ; Process the messages in the inbox
+
+  ifelse bus_id = 24 [
+
+    let old_inbox inbox
+    set inbox []
+
+    foreach old_inbox [
+      ; check if vote
+      let sender_bus item 1 ?
+      let message item 2 ?
+
+      ifelse item 0 message = "vote" [
+        set total_capacity (total_capacity + item 1 message)
+      ] [
+        set bids lput (list (item 1 message) sender_bus) bids
+      ]
+    ]
+  ] [
+
+    let old_inbox inbox
+    set inbox []
+
+    foreach old_inbox [
+
+      let message item 2 ?
+      if message = "You won" [
+        ; calculate known_route
+        set known_route compute_route_to_destination
+      ]
+    ]
+  ]
+
+end
+
+
+to process_bids
+
+  if bus_id = 24 [
+
+    let mean_capacity total_capacity / total_buses
+    let to_send_buses n-values ceiling ((item busiest_stop business_stops) / mean_capacity) [?]
+    let position_beliefs sort-by [item 0 ?1 > item 0 ?2] bids
+    set bids []  ; set bids to empty
+
+    if length position_beliefs > 0 [
+      ; send destination to the "5" nearest buses
+      set total_orders total_orders + length to_send_buses
+
+      show total_orders
+
+      foreach to_send_buses [
+        let lucky_bus item ? position_beliefs
+        send-message item 1 lucky_bus "You won"
+      ]
+    ]
+  ]
+
+end
