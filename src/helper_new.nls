@@ -40,3 +40,22 @@ to-report bus_capacity
   ]
   report capacity
 end
+
+to-report linear_fit [ l ]
+  let dt []
+  let iter n-values ( length l - 1 ) [?]
+  foreach iter [
+     set dt lput ( (item (? + 1) l - (item ? l) )) dt
+  ]
+  let angle sum dt / length dt
+  report angle
+end
+
+
+to-report slice [ i l ]
+  let s []
+  foreach l [
+    set s lput item i ? s
+  ]
+  report s
+end

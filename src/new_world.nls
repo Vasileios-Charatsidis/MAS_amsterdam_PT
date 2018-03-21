@@ -11,12 +11,15 @@ to check_inbox
   ; Process the messages in the inbox
 
   ifelse bus_id = 24 [
+    
+    let free-spaces 0
+    
     foreach inbox [
       ; check if vote
       let message item 2 ?
 
       if item 0 message = "vote" [
-        set total_capacity (total_capacity + item 1 message)
+        set free-spaces ( free-spaces + item 1 message )
       ]
 
       if item 0 message = "bid" [
@@ -24,25 +27,89 @@ to check_inbox
       ]
     ]
 
-    set inbox []
+    if free-spaces > 0 or count buses = 1 [
+      process_votes free-spaces
+    ]
 
   ] [
+    foreach inbox [
+      ; check if oracle needs your vote
+      let message item 2 ?
+      if message = "please start vote" [
+        send-message 24 ( list "vote" free_spaces_on_bus )
+      ]
+    ]
 
   ]
+  
+  set inbox []
 
 end
 
 
-to decide_add_bus
+to decide_start_vote
   ; Only oracle can decide to add buses to system
-
+  
   if bus_id = 24 [
+    
+    ; decide whether to add a bus based on how much capacity there is in the world
+    ; and how many people we estimate are in the world. Assume full buses.
     let decision_ratio (total_capacity / (total_capacity + total_passenger_count))
-    if decision_ratio < add_bus_threshold [
-      add-bus ((random 3) + 1)
+        
+    if decision_ratio < add_bus_threshold and wait_for_votes = False [
+      
+      let n_buses count buses
+      let bus_ids n-values n_buses [ 24 + ? ]
+      foreach bus_ids [
+        if ? != 24 [
+          send-message ? "please start vote" 
+        ]        
+      ]      
+      ;set wait_for_votes True
+    ]
+      
+    ; keep track of growth history to help decide what size bus to add in the future
+    set history lput decision_ratio but-first history
+  ]
+  
+end
+
+to process_votes [ free-spaces ]
+  ; this function should only be called by the oracle
+  
+  ; determine if we still need to add a new bus based on the buses' second opinion
+  let decision_ratio (total_capacity / (total_capacity - free-spaces + total_passenger_count))
+  
+  if decision_ratio < add_bus_threshold [
+    ; if we need to add a bus, determine what size
+    let need new_bus_need
+    if need < need_thresh_1 [
+      ifelse need < need_thresh_2 [
+        ifelse need < need_thresh_3 [
+          add-bus 3
+          set total_capacity total_capacity + 150
+        ][
+        add-bus 2
+        set total_capacity total_capacity + 60
+        ]
+      ][
+      add-bus 1
+      set total_capacity total_capacity + 12
+      ]
     ]
   ]
+  
+  set wait_for_votes False
+end
 
+to-report new_bus_need
+  ; the need for a bus is determined by how steeply the amount of planless passengers increased in the past few ticks
+  ; also influenced by the time of day, later in the day we'll be more hesitant to buy new busses
+
+  let discounted 0 ; the factor with which we want to multiply need at the end of the day
+  let angle linear_fit history
+  let time_factor 1 - (( ( 1 - discounted ) * ticks ) / total_ticks_per_day )
+  report angle * time_factor
 end
 
 
