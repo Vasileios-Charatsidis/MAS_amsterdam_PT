@@ -16,6 +16,7 @@ buses-own [
   distance_mat    ; a matrix containing the shortest distance from one bus stop to the other (also considering paths that are not directly connected)
 
   ; ORACLE exclusive
+  second_opinion  ; a boolean that will allow us to switch voting on and off
   night_team      ; a list of buses to be added at 0:00
   morning_team    ; a list of buses to be added at 6:00
   total_capacity  ; total capacity in the world
@@ -26,7 +27,7 @@ buses-own [
   need_thresh_2   ; above how much 'need' we should add a bus of type 2
   need_thresh_3   ; above how much 'need' we should add a bus of type 3
   total_ticks_per_day
-  wait_for_votes  ; a boolean that tells the oracle to not send out a voting request each tick it's waiting on a response to the previous voting round
+  tick_of_vote    ; blah
 ]
 
 
@@ -73,22 +74,31 @@ to init-buses
   set known_route []
   
   ; ORACLE exlusive ( will also be added for other buses, but never used )
-  set night_team [ 1 1 1 ]
-  set morning_team [ 3 3 3 3 3 3 2 2 2 2 2 1 1 1 1 1 ]
+  set second_opinion False
+  set night_team [ 1 1 1 1 ]
+  set morning_team [ 3 3 3  2 2 2 2 2  1 1 1 1 1 1 ]
   set total_capacity bus_capacity
-  set add_bus_threshold 0.9
+  set add_bus_threshold 0.8
   set history n-values 12 [ 0 ]
   set total_ticks_per_day 1440
-  set wait_for_votes False
+  set tick_of_vote 0
+  set need_thresh_1 0 ; above how much 'need' we should add a bus of type 1
+  set need_thresh_2 -.00005 ; above how much 'need' we should add a bus of type 2
+  set need_thresh_3 -.004 ; above how much 'need' we should add a bus of type 3
   ;set position_belief n-values 24 []   ; FIXME
 
 end
 
 
 to execute-actions
-
+  
+;  if bus_id = 24 [
+;    show ticks
+;  ]
+  
   check_inbox ; if votes are in, this function processes them as well
-  decide_start_vote
+  add_fixed_buses ; orcale adds night team and morning team
+  decide_start_vote  
   decide_send_bid
   give_route
 

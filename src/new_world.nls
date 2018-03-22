@@ -1,10 +1,10 @@
-to send_vote
-  ; On creation of a bus send a vote to the oracle
-
-  let message list "vote" bus_capacity
-  send-message 24 message
-
-end
+;to send_vote
+;  ; On creation of a bus send a vote to the oracle
+;
+;  let message list "vote" bus_capacity
+;  send-message 24 message
+;
+;end
 
 
 to check_inbox
@@ -12,14 +12,16 @@ to check_inbox
 
   ifelse bus_id = 24 [
     
-    let free-spaces 0
+    let free_spaces 0
+    let vote_is_in False
     
     foreach inbox [
       ; check if vote
       let message item 2 ?
 
       if item 0 message = "vote" [
-        set free-spaces ( free-spaces + item 1 message )
+        set free_spaces ( free_spaces + item 1 message )
+        set vote_is_in True
       ]
 
       if item 0 message = "bid" [
@@ -27,8 +29,11 @@ to check_inbox
       ]
     ]
 
-    if free-spaces > 0 or count buses = 1 [
-      process_votes free-spaces
+    if vote_is_in or count buses = 1 [
+      let to_add get_second_opinion free_spaces
+      if to_add [
+        oracle_adds_bus 
+      ]
     ]
 
   ] [
@@ -46,6 +51,33 @@ to check_inbox
 
 end
 
+to add_fixed_buses
+  if bus_id = 24 [
+  ; at 0:00 add the 'night team'
+    if length night_team > 0 [ ; add some busses at 6:00, one every tick
+      add-bus item 0 night_team
+      set night_team but-first night_team
+    ]
+    
+    ; at 6:00 add the 'morning team'
+    if ticks > 360 and length morning_team > 0 [ ; add some busses at 6:00, one every tick
+      add-bus item 0 morning_team
+      set morning_team but-first morning_team
+    ]
+  ]
+  
+end
+
+to request_vote
+  let n_buses count buses
+  let bus_ids n-values n_buses [ 24 + ? ]
+  foreach bus_ids [
+    if ? != 24 [
+      send-message ? "please start vote" 
+    ]        
+  ]
+  set tick_of_vote ticks
+end
 
 to decide_start_vote
   ; Only oracle can decide to add buses to system
@@ -54,18 +86,14 @@ to decide_start_vote
     
     ; decide whether to add a bus based on how much capacity there is in the world
     ; and how many people we estimate are in the world. Assume full buses.
-    let decision_ratio (total_capacity / (total_capacity + total_passenger_count))
-        
-    if decision_ratio < add_bus_threshold and wait_for_votes = False [
-      
-      let n_buses count buses
-      let bus_ids n-values n_buses [ 24 + ? ]
-      foreach bus_ids [
-        if ? != 24 [
-          send-message ? "please start vote" 
-        ]        
-      ]      
-      ;set wait_for_votes True
+    let decision_ratio (total_capacity / (total_capacity + total_passenger_count))   
+            
+    if decision_ratio < add_bus_threshold and tick_of_vote != (ticks - 1) and second_opinion [
+      request_vote
+    ]
+    
+    if decision_ratio < add_bus_threshold and not second_opinion [
+      oracle_adds_bus
     ]
       
     ; keep track of growth history to help decide what size bus to add in the future
@@ -74,32 +102,37 @@ to decide_start_vote
   
 end
 
-to process_votes [ free-spaces ]
+to oracle_adds_bus  
+  ; if we need to add a bus, determine what size
+  let need new_bus_need
+  if need < need_thresh_1 [
+    ifelse need < need_thresh_2 [
+      ifelse need < need_thresh_3 [
+        add-bus 3
+        set total_capacity total_capacity + 150
+      ][
+      add-bus 2
+      set total_capacity total_capacity + 60
+      ]
+    ][
+    add-bus 1
+    set total_capacity total_capacity + 12
+    ]
+  ] 
+end
+
+to-report get_second_opinion [ free-spaces ]
   ; this function should only be called by the oracle
   
   ; determine if we still need to add a new bus based on the buses' second opinion
   let decision_ratio (total_capacity / (total_capacity - free-spaces + total_passenger_count))
   
-  if decision_ratio < add_bus_threshold [
-    ; if we need to add a bus, determine what size
-    let need new_bus_need
-    if need < need_thresh_1 [
-      ifelse need < need_thresh_2 [
-        ifelse need < need_thresh_3 [
-          add-bus 3
-          set total_capacity total_capacity + 150
-        ][
-        add-bus 2
-        set total_capacity total_capacity + 60
-        ]
-      ][
-      add-bus 1
-      set total_capacity total_capacity + 12
-      ]
-    ]
+  let to_add False
+  if decision_ratio < add_bus_threshold [    
+    set to_add True
   ]
   
-  set wait_for_votes False
+  report to_add  
 end
 
 to-report new_bus_need
