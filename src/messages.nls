@@ -1,9 +1,12 @@
-to send_vote
-  ; On creation of a bus send a vote to the oracle
-
-  let message list "vote" bus_capacity bus_type
-  send-message 24 message
-
+to request_vote
+  let n_buses count buses
+  let bus_ids n-values n_buses [ 24 + ? ]
+  foreach bus_ids [
+    if ? != 24 [
+      send-message ? "please start vote"
+    ]
+  ]
+  set tick_of_vote ticks
 end
 
 
@@ -33,6 +36,8 @@ to check_inbox
 
     let old_inbox inbox
     set inbox []
+    let free_spaces 0
+    let vote_is_in false
 
     foreach old_inbox [
       ; check if vote
@@ -40,11 +45,20 @@ to check_inbox
       let message item 2 ?
 
       ifelse item 0 message = "vote" [
-        set total_capacity (total_capacity + item 1 message)
+        set free_spaces ( free_spaces + item 1 message )
+        set vote_is_in true
       ] [
         set bids lput (list (item 1 message) sender_bus) bids
       ]
     ]
+
+    if vote_is_in or count buses = 1 [
+      let to_add get_second_opinion free_spaces
+      if to_add [
+        oracle_adds_bus
+      ]
+    ]
+
   ] [
 
     let old_inbox inbox
@@ -56,6 +70,10 @@ to check_inbox
       if message = "You won" [
         ; calculate known_route
         set known_route compute_route_to_destination
+      ]
+
+      if message = "please start vote" [
+        send-message 24 ( list "vote" free_spaces_on_bus )
       ]
     ]
   ]

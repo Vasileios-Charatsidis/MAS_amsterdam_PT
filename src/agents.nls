@@ -1,4 +1,6 @@
-__includes [ "new_world.nls" "helper_new.nls" ]
+__includes [ "new_world.nls" "messages.nls" "helper_new.nls" ]
+
+extensions [ nw ]
 
 buses-own [
   ; Static, read-only variables. These values never change. You can read them, but you cannot change them.
@@ -20,7 +22,7 @@ buses-own [
   business_stops
   business_interval;
   bidding_threshold
-
+  history
   total_orders
 
   ; ORACLE exclusive
@@ -79,9 +81,9 @@ to init-buses
 
   set business_interval 30
   set known_route []
-  
+
   ; ORACLE exlusive ( will also be added for other buses, but never used )
-  set second_opinion False
+  set second_opinion false
   set night_team [ 1 1 1 1 ]
   set morning_team [ 3 3 3  2 2 2 2 2  1 1 1 1 1 1 ]
 
@@ -95,14 +97,12 @@ to init-buses
   ;set position_belief n-values 24 []   ; FIXME
 
   ; ORACLE exclusive
-  ifelse bus_id = 24 [
+  if bus_id = 24 [
     set bids []
     set total_capacity bus_capacity bus_type
     set total_buses 1
     set add_bus_threshold 0.9
     set total_orders 0
-  ] [
-    send_vote
   ]
 
 end
