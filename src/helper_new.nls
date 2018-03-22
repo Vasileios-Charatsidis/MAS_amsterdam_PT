@@ -1,3 +1,22 @@
+to-report route_from_nw_list [ edges from_location ]
+
+  let return_list []
+  set return_list lput from_location return_list
+
+  foreach edges [
+   let idx 0
+    if item 0 ? = from_location [
+      set idx 1
+    ]
+
+    set from_location item idx ?
+    set return_list lput from_location return_list
+  ]
+
+  report return_list
+end
+
+
 to-report total_passenger_count
 
   let total_waiting 0
@@ -13,26 +32,28 @@ to-report total_passenger_count
 
 end
 
+
 to-report free_spaces_on_bus
   ; Compute the number of free spaces on the bus
   ; Return:
   ;   @number: free spaces
 
-  let capacity bus_capacity
+  let capacity bus_capacity bus_type
 
   report capacity - length bus_passengers
 end
 
-to-report bus_capacity
+
+to-report bus_capacity [ b_type ]
   ; Return:
   ;   @capacity: the capacity of the bus based on its type
 
   let capacity 0
 
-  ifelse bus_type = 1 [
+  ifelse b_type = 1 [
     set capacity 12
   ] [
-    ifelse bus_type = 2 [
+    ifelse b_type = 2 [
       set capacity 60
     ] [
       set capacity 150
@@ -40,6 +61,101 @@ to-report bus_capacity
   ]
   report capacity
 end
+
+
+to-report help [ passenger bus_stop_from bus_stop_to ]
+  ; help is defined as the reduction in shortest travel distance to the destination from one station to another
+  ; if destination is C and A-->C=7, B-->C=5, then help(A-->B)=2, regardless of the distance between A and B
+  report ( item bus_stop_from item ( item 1 passenger ) distance_mat ) - ( item bus_stop_to item ( item 1 passenger ) distance_mat )
+end
+
+
+to-report utility [ bus_stop ]
+
+  let dropoffs 0
+  foreach bus_passengers [
+     if item 1 ? = bus_stop [
+       set dropoffs dropoffs + 1
+     ]
+  ]
+
+  let passengers_at_stop get-passengers-at-stop bus_stop
+
+  ; potential_pickups
+  let potential_pickups min list length passengers_at_stop free_spaces_on_bus
+
+  ; overalapping destinations
+  let bus_destinations n-values 24 [0]
+  foreach bus_passengers [
+    let idx item 1 ?
+    ; set bus_destinations position idx 1
+    set bus_destinations replace-item idx bus_destinations 1
+  ]
+
+  let overlapp 0
+  foreach passengers_at_stop [
+    let destination item 1 ?
+    if destination = 1 [
+        set overlapp (overlapp + 1)
+    ]
+  ]
+
+  ; alpha
+  let alpha free_spaces_on_bus / bus_capacity bus_type
+  ; set pickups to mean of possible pickups and number of passengers with same destination as the ones onboard
+  ; only do this if the bus is not empty?
+  let pickups mean list potential_pickups overlapp
+  let utility_value (1 - alpha) * dropoffs + alpha * pickups
+
+  ; This is experimental. This adds to the performance signigicantly
+  ; The idea is to go to the node which is nearer to the passengers on board (currently takes the sum)
+  ; It is quite intuitive for the following case:
+  ;    If the number of potential_pickups and potential_dropoffs is the same for multiple nodes,
+  ;    Then choose the node which helps multiple passengers.
+  ; Further work could include choosing the weights of utility_value and total_help.
+  let total_help 0
+  foreach bus_passengers [
+    let h help ? current_stop bus_stop
+
+    set total_help (total_help + h)
+  ]
+
+  report utility_value + total_help
+
+end
+
+
+to-report parse_route [ buffer ]
+    ; buffer = (route x y)
+
+    set buffer substring buffer 7 (length buffer - 1)
+    set buffer (word "[" buffer "]")
+
+    report read-from-string buffer
+
+end
+
+
+to-report compute_business_stops
+
+  let businesses []
+
+  ; get every station's neighbourhood business
+  let iter n-values 24 [ ? ]
+  foreach iter [
+    let global_business length get-passengers-at-stop ?
+    let connecting_nodes item ? graph
+    foreach connecting_nodes [
+      set global_business global_business + length get-passengers-at-stop ?
+    ]
+    set global_business global_business / ( length connecting_nodes + 1 )
+    set businesses lput global_business businesses
+  ]
+
+  report businesses
+
+end
+
 
 to-report linear_fit [ l ]
   let dt []
@@ -59,3 +175,4 @@ to-report slice [ i l ]
   ]
   report s
 end
+

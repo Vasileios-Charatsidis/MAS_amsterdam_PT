@@ -1,0 +1,106 @@
+to request_vote
+  let n_buses count buses
+  let bus_ids n-values n_buses [ 24 + ? ]
+  foreach bus_ids [
+    if ? != 24 [
+      send-message ? "please start vote"
+    ]
+  ]
+  set tick_of_vote ticks
+end
+
+
+to send_bid
+  ; Send a bid to the busiest_stop
+
+  if bus_id > 24 [
+
+    let from_location current_stop
+
+    if from_location = -1 [
+      set from_location next_stop
+    ]
+
+    let bid item busiest_stop (item from_location distance_mat)
+    let message list "bid" bid
+    send-message 24 message
+  ]
+
+end
+
+
+to check_inbox
+  ; Process the messages in the inbox
+
+  ifelse bus_id = 24 [
+
+    let old_inbox inbox
+    set inbox []
+    let free_spaces 0
+    let vote_is_in false
+
+    foreach old_inbox [
+      ; check if vote
+      let sender_bus item 1 ?
+      let message item 2 ?
+
+      ifelse item 0 message = "vote" [
+        set free_spaces ( free_spaces + item 1 message )
+        set vote_is_in true
+      ] [
+        set bids lput (list (item 1 message) sender_bus) bids
+      ]
+    ]
+
+    if vote_is_in or count buses = 1 [
+      let to_add get_second_opinion free_spaces
+      if to_add [
+        oracle_adds_bus
+      ]
+    ]
+
+  ] [
+
+    let old_inbox inbox
+    set inbox []
+
+    foreach old_inbox [
+
+      let message item 2 ?
+      if message = "You won" [
+        ; calculate known_route
+        set known_route compute_route_to_destination
+      ]
+
+      if message = "please start vote" [
+        send-message 24 ( list "vote" free_spaces_on_bus )
+      ]
+    ]
+  ]
+
+end
+
+
+to process_bids
+
+  if bus_id = 24 [
+
+    let mean_capacity total_capacity / total_buses
+    let to_send_buses n-values ceiling ((item busiest_stop business_stops) / mean_capacity) [?]
+    let position_beliefs sort-by [item 0 ?1 > item 0 ?2] bids
+    set bids []  ; set bids to empty
+
+    if length position_beliefs > 0 [
+      ; send destination to the "5" nearest buses
+      set total_orders total_orders + length to_send_buses
+
+      show total_orders
+
+      foreach to_send_buses [
+        let lucky_bus item ? position_beliefs
+        send-message item 1 lucky_bus "You won"
+      ]
+    ]
+  ]
+
+end
