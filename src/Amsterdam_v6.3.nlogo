@@ -295,7 +295,7 @@ to set-time
 end
 
 to get-daily-ridership-schedule
-  let file_name (word "passengers-location_day1.csv")
+  let file_name (word "../data/passengers-location_day1.csv")
 ;  let file_name (word "passengers-location_day4.csv")
 ;  let file_name "test_case1.csv"
   let daily_ridership_schedule parse-file-information file_name

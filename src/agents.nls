@@ -1,4 +1,4 @@
-__includes [ "new_world.nls" "messages.nls" "helper_new.nls" ]
+__includes [ "new_world.nls" "messages.nls" "helper.nls" ]
 
 extensions [ nw ]
 

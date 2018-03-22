@@ -72,9 +72,9 @@ to-report get_second_opinion [ free-spaces ]
   ; determine if we still need to add a new bus based on the buses' second opinion
   let decision_ratio (total_capacity / (total_capacity - free-spaces + total_passenger_count))
 
-  let to_add False
+  let to_add false
   if decision_ratio < add_bus_threshold [
-    set to_add True
+    set to_add true
   ]
 
   report to_add
