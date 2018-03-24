@@ -53,7 +53,7 @@ to check_inbox
     ]
 
     if vote_is_in or count buses = 1 [
-      let to_add get_second_opinion free_spaces
+      let to_add get_second_opinion (free_spaces + (bus_capacity 1) - (length bus_passengers))
       if to_add [
         oracle_adds_bus
       ]
@@ -93,8 +93,6 @@ to process_bids
     if length position_beliefs > 0 [
       ; send destination to the "5" nearest buses
       set total_orders total_orders + length to_send_buses
-
-      show total_orders
 
       foreach to_send_buses [
         let lucky_bus item ? position_beliefs

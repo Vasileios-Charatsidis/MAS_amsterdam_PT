@@ -1,5 +1,3 @@
-
-
 to add_fixed_buses
   if bus_id = 24 [
   ; at 0:00 add the 'night team'
@@ -69,8 +67,10 @@ end
 to-report get_second_opinion [ free-spaces ]
   ; this function should only be called by the oracle
 
+  ;show (word total_capacity " " free-spaces " " total_passenger_count)
+
   ; determine if we still need to add a new bus based on the buses' second opinion
-  let decision_ratio (total_capacity / (total_capacity - free-spaces + total_passenger_count))
+  let decision_ratio (total_capacity / (1 + total_capacity - free-spaces + total_passenger_count))
 
   let to_add false
   if decision_ratio < add_bus_threshold [
@@ -151,10 +151,14 @@ to-report get_next_stop
   let max_utility -1000000
 
   ; 10 percent randomeness added. If 1, then the next stop will be randomly chosen
-  let random_route [0 0 0 0 0 0 0 0 0 1]
-  let r_idx random length random_route
+  let holy_bram (ceiling (1 / randomness))
 
-  if (item r_idx random_route = 1) [
+  let r_list n-values (holy_bram - 1) [0]
+  set r_list lput 1 r_list
+
+  let r_idx item (random holy_bram) r_list
+
+  if (r_idx = 1) [
     let random_next_node random length connecting_nodes
     report item random_next_node connecting_nodes
   ]
@@ -211,6 +215,24 @@ to pickup_passengers
 
   let free_spaces bus_capacity bus_type - (length bus_passengers)
   let passengers_at_stop get-passengers-at-stop current_stop
+
+  ; ; Give priority to people along the known_route
+  ; if length known_route > 0 [
+  ;   repeat min list free_spaces length passengers_at_stop [
+  ;
+  ;     let r_passenger item random length passengers_at_stop passengers_at_stop
+  ;     ; let h help r_passenger current_stop next_stop
+  ;     let d position (item 1 r_passenger) known_route
+  ;
+  ;     show (word d "   " item 1 r_passenger "   " known_route)
+  ;
+  ;     if d != false [
+  ;       ; show "priority"
+  ;       pick-up-passenger item 0 r_passenger
+  ;       set free_spaces (free_spaces - 1)
+  ;     ]
+  ;   ]
+  ; ]
 
   ; Only pickup free_spaces number of passengers
   repeat min list free_spaces length passengers_at_stop [
