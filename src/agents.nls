@@ -26,6 +26,7 @@ buses-own [
   total_orders
   beta
   randomness
+  time_decay
 
   ; ORACLE exclusive
   total_capacity  ; total capacity in the world
@@ -85,18 +86,19 @@ to init-buses
   set bidding_threshold 1.5
   set known_route []
   set beta 1
+  set time_decay 0.5
 
   set second_opinion true
   set night_team [ 1 1 1 1 ]
   set morning_team [ 3 3 3  2 2 2 2 2  1 1 1 1 1 1 ]
   set randomness 0.1
 
-  set add_bus_threshold 0.8
+  set add_bus_threshold 2
   set history n-values 12 [ 0 ]
   set total_ticks_per_day 1440
   set tick_of_vote 0
   set need_thresh_1 0        ; above how much 'need' we should add a bus of type 1
-  set need_thresh_2 -.00005  ; above how much 'need' we should add a bus of type 2
+  set need_thresh_2 -.0005  ; above how much 'need' we should add a bus of type 2
   set need_thresh_3 -.004    ; above how much 'need' we should add a bus of type 3
 
   ; ORACLE exclusive

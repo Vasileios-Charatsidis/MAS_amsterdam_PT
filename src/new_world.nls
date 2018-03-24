@@ -3,12 +3,18 @@ to add_fixed_buses
   ; at 0:00 add the 'night team'
     if length night_team > 0 [ ; add some busses at 6:00, one every tick
       add-bus item 0 night_team
+      set total_capacity (total_capacity + bus_capacity item 0 night_team)
+      set total_buses (total_buses + 1)
+
       set night_team but-first night_team
     ]
 
     ; at 6:00 add the 'morning team'
     if ticks > 360 and length morning_team > 0 [ ; add some busses at 6:00, one every tick
       add-bus item 0 morning_team
+      set total_capacity (total_capacity + bus_capacity item 0 morning_team)
+      set total_buses (total_buses + 1)
+
       set morning_team but-first morning_team
     ]
   ]
@@ -24,17 +30,26 @@ to decide_start_vote
     ; decide whether to add a bus based on how much capacity there is in the world
     ; and how many people we estimate are in the world. Assume full buses.
     let decision_ratio (total_capacity / (total_capacity + total_passenger_count))
+    let time_factor (1 - (ticks  / total_ticks_per_day))
 
-    if decision_ratio < add_bus_threshold and tick_of_vote != (ticks - 1) and second_opinion [
-      request_vote
+    if time_factor = 0 [
+      set time_factor 0.001
     ]
 
-    if decision_ratio < add_bus_threshold and not second_opinion [
+    let p exp ((log time_factor e) * time_decay)
+
+    if decision_ratio < (add_bus_threshold * p) and tick_of_vote != (ticks - 1) and second_opinion [
+      request_vote
+    ]
+    ;show (word "T: " (add_bus_threshold * p) " B: " total_buses)
+
+    if decision_ratio < (add_bus_threshold * p) and not second_opinion [
       oracle_adds_bus
     ]
 
     ; keep track of growth history to help decide what size bus to add in the future
     set history lput decision_ratio but-first history
+
   ]
 
 end
@@ -67,13 +82,18 @@ end
 to-report get_second_opinion [ free-spaces ]
   ; this function should only be called by the oracle
 
-  ;show (word total_capacity " " free-spaces " " total_passenger_count)
+  let time_factor (1 - (ticks  / total_ticks_per_day))
+  if time_factor = 0 [
+    set time_factor 0.001
+  ]
+
+  let p exp ((log time_factor e) * time_decay)
 
   ; determine if we still need to add a new bus based on the buses' second opinion
   let decision_ratio (total_capacity / (1 + total_capacity - free-spaces + total_passenger_count))
-
   let to_add false
-  if decision_ratio < add_bus_threshold [
+
+  if decision_ratio < (add_bus_threshold * p) [
     set to_add true
   ]
 
@@ -85,10 +105,8 @@ to-report new_bus_need
   ; the need for a bus is determined by how steeply the amount of planless passengers increased in the past few ticks
   ; also influenced by the time of day, later in the day we'll be more hesitant to buy new busses
 
-  let discounted 0 ; the factor with which we want to multiply need at the end of the day
   let angle linear_fit history
-  let time_factor 1 - (( ( 1 - discounted ) * ticks ) / total_ticks_per_day )
-  report angle * time_factor
+  report angle
 end
 
 
