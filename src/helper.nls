@@ -120,7 +120,7 @@ to-report utility [ bus_stop ]
     set total_help (total_help + h)
   ]
 
-  report alpha * beta * utility_value + (1 - alpha) * total_help
+  report beta * utility_value + total_help
 
 end
 

@@ -96,7 +96,7 @@ to init-buses
   set total_ticks_per_day 1440
   set tick_of_vote 0
   set need_thresh_1 0        ; above how much 'need' we should add a bus of type 1
-  set need_thresh_2 -.0005   ; above how much 'need' we should add a bus of type 2
+  set need_thresh_2 -.00005  ; above how much 'need' we should add a bus of type 2
   set need_thresh_3 -.004    ; above how much 'need' we should add a bus of type 3
 
   ; ORACLE exclusive
