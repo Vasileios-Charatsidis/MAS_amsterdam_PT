@@ -41,7 +41,6 @@ to decide_start_vote
     if decision_ratio < (add_bus_threshold * p) and tick_of_vote != (ticks - 1) and second_opinion [
       request_vote
     ]
-    ;show (word "T: " (add_bus_threshold * p) " B: " total_buses)
 
     if decision_ratio < (add_bus_threshold * p) and not second_opinion [
       oracle_adds_bus
